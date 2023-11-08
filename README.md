@@ -25,7 +25,7 @@ pool1.shutdown();
 
 ```
 
-See [example](https://github.com/aymtools/isolate_pool_executor/example) for detailed test
+See [example](https://github.com/aymtools/isolate_pool_executor/blob/master/example/isolate_pool_executor_example.dart) for detailed test
 case.
 
 ## Issues
