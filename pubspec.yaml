@@ -5,3 +5,6 @@ homepage: https://github.com/aymtools/isolate_pool_executor
 
 environment:
   sdk: '>=2.15.0 <4.0.0'
+
+dependencies:
+  cancellable: ^1.0.9+1

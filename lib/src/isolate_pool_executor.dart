@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:isolate';
 
+import 'package:cancellable/cancellable.dart';
+
 int _currIndex = 0;
 
 const _maxIndex = 0xffffffffffff;
@@ -16,28 +18,51 @@ class ITask<R> {
   final _Task _task;
 
   final Completer<R> _computer;
+  final Cancellable? _cancellable;
 
-  ITask._task(int taskId, String taskLabel,
-      FutureOr Function(dynamic q) function, dynamic message)
+  ITask._task(
+      int taskId,
+      String taskLabel,
+      FutureOr Function(Cancellable cancellable, dynamic q) function,
+      dynamic message,
+      this._cancellable)
       : _task = _Task(function, message, taskId, taskLabel),
-        _computer = Completer<R>();
+        _computer = Completer<R>() {
+    _cancellable?.whenCancel.then((value) => _proxyCancel());
+  }
 
   Future<R> get future => _computer.future;
 
   int get taskId => _task.taskId;
 
   void _submit(_TaskResult result) {
-    if (_computer.isCompleted) return;
     if (result.err == null) {
+      if (_cancellable?.isAvailable == false) return;
+      if (_computer.isCompleted) return;
       _computer.complete(result.result);
     } else {
-      _computer.completeError(result.err, result.stackTrace);
+      _submitError(result.err, result.stackTrace);
     }
   }
 
   void _submitError(Object error, [StackTrace? stackTrace]) {
+    _callCancel = null;
+    if (_cancellable?.isAvailable == false) return;
     if (_computer.isCompleted) return;
+    if (error is CancelledException) {
+      Timer.run(() {
+        _cancellable?.cancel(error.reason);
+      });
+      return;
+    }
     _computer.completeError(error, stackTrace);
+  }
+
+  Future<void> Function(int id)? _callCancel;
+
+  void _proxyCancel() {
+    final id = _task.taskId;
+    _callCancel?.call(id);
   }
 }
 
@@ -55,7 +80,7 @@ class _Task {
   final String taskLabel;
   final int taskId;
   final dynamic message;
-  final FutureOr Function(dynamic q) function;
+  final FutureOr Function(Cancellable cancellable, dynamic q) function;
 
   _Task(this.function, this.message, this.taskId, this.taskLabel);
 
@@ -77,14 +102,28 @@ class _IsolateExecutor {
   bool get isIdle => task == null;
 
   void emit(ITask task) {
+    if (task._cancellable?.isUnavailable == true) return;
     this.task = task;
     sendPort.then((value) {
-      if (!isClosed) value.send(task._task);
+      if (!isClosed && task._cancellable?.isUnavailable != true) {
+        task._callCancel = cancelTask;
+        value.send(task._task);
+      }
     });
+  }
+
+  Future<void> cancelTask(int id) async {
+    if (!isClosed) {
+      final sp = await sendPort;
+      if (!isClosed) {
+        sp.send(id);
+      }
+    }
   }
 
   void submit(_TaskResult result) {
     if (result.taskId == task?.taskId) {
+      task?._callCancel = null;
       task?._submit(result);
     }
     task = null;
@@ -93,12 +132,16 @@ class _IsolateExecutor {
   ITask? close() {
     isClosed = true;
     final t = task;
+    t?._callCancel = null;
     whenClose?.call();
     task = null;
     receivePort.close();
     watchDog.close();
     isolate?.kill();
     whenClose = null;
+    if (t?._cancellable?.isUnavailable == true) {
+      return null;
+    }
     return t;
   }
 }
@@ -139,6 +182,7 @@ class IsolatePoolExecutor {
 
   bool _shutdown = false;
 
+  final String? debugLabel;
   int _isolateIndex = 0;
 
   IsolatePoolExecutor(
@@ -146,35 +190,59 @@ class IsolatePoolExecutor {
       required this.maximumPoolSize,
       required this.keepAliveTime,
       required this.taskQueue,
-      required this.handler})
+      required this.handler,
+      this.debugLabel})
       : _coreExecutor = List.filled(corePoolSize, null),
         _cacheExecutor = [],
         assert(maximumPoolSize >= corePoolSize,
             'must maximumPoolSize >= corePoolSize');
 
-  factory IsolatePoolExecutor.newFixedIsolatePool(int nIsolates) =>
+  factory IsolatePoolExecutor.newFixedIsolatePool(int nIsolates,
+          {String? debugLabel}) =>
       IsolatePoolExecutor(
           corePoolSize: nIsolates,
           maximumPoolSize: nIsolates,
           keepAliveTime: const Duration(seconds: 1),
           taskQueue: Queue(),
-          handler: RejectedExecutionHandler.abortPolicy);
+          handler: RejectedExecutionHandler.abortPolicy,
+          debugLabel: debugLabel);
 
-  factory IsolatePoolExecutor.newSingleIsolateExecutor() =>
-      IsolatePoolExecutor.newFixedIsolatePool(1);
+  factory IsolatePoolExecutor.newSingleIsolateExecutor({String? debugLabel}) =>
+      IsolatePoolExecutor.newFixedIsolatePool(1, debugLabel: debugLabel);
 
-  factory IsolatePoolExecutor.newCachedIsolatePool() => IsolatePoolExecutor(
-      corePoolSize: 0,
-      // java中int最大值 魔法数
-      maximumPoolSize: 2147483647,
-      keepAliveTime: const Duration(),
-      taskQueue: Queue(),
-      handler: RejectedExecutionHandler.abortPolicy);
+  factory IsolatePoolExecutor.newCachedIsolatePool({String? debugLabel}) =>
+      IsolatePoolExecutor(
+          corePoolSize: 0,
+          // java中int最大值 魔法数
+          maximumPoolSize: 2147483647,
+          keepAliveTime: const Duration(),
+          taskQueue: Queue(),
+          handler: RejectedExecutionHandler.abortPolicy,
+          debugLabel: debugLabel);
 
   Future<R> compute<Q, R>(FutureOr<R> Function(Q message) callback, Q message,
-      {String? debugLabel}) async {
+      {Cancellable? cancellable, String? debugLabel}) async {
+    if (cancellable?.isUnavailable == true) {
+      return Completer<R>().future;
+    }
     debugLabel ??= callback.toString();
-    return _makeTask<R>((d) => callback(d), message, debugLabel).future;
+    final task =
+        _makeTask<R>((_, d) => callback(d), message, debugLabel, cancellable);
+    return task.future;
+  }
+
+  Future<R> computeC<Q, R>(
+      FutureOr<R> Function(Cancellable cancellable, Q message) callback,
+      Q message,
+      {required Cancellable cancellable,
+      String? debugLabel}) async {
+    if (cancellable.isUnavailable) {
+      return Completer<R>().future;
+    }
+    debugLabel ??= callback.toString();
+    final task = _makeTask<R>((cancellable, d) => callback(cancellable, d),
+        message, debugLabel, cancellable);
+    return task.future;
   }
 
   void shutdown({bool force = false}) {
@@ -196,12 +264,19 @@ class IsolatePoolExecutor {
   }
 
   ITask<R> _makeTask<R>(
-      dynamic Function(dynamic p) run, dynamic p, String debugLabel) {
+      dynamic Function(Cancellable cancellable, dynamic p) run,
+      dynamic p,
+      String debugLabel,
+      Cancellable? cancellable) {
     if (_shutdown) throw 'IsolatePoolExecutor is shutdown';
 
-    ITask<R> task = ITask<R>._task(_nextTaskId(), debugLabel, run, p);
+    ITask<R> task =
+        ITask<R>._task(_nextTaskId(), debugLabel, run, p, cancellable);
 
     _addTask(task);
+    cancellable?.onCancel.then((value) {
+      taskQueue.remove(task);
+    });
 
     return task;
   }
@@ -224,7 +299,8 @@ class IsolatePoolExecutor {
         case RejectedExecutionHandler.abortPolicy:
           rethrow;
         case RejectedExecutionHandler.callerRunsPolicy:
-          _runTask(task);
+          _runTask(task._cancellable ?? Cancellable(), task._task)
+              .then((value) => task._submit(value));
           break;
         case RejectedExecutionHandler.discardOldestPolicy:
           taskQueue.removeFirst();
@@ -236,10 +312,10 @@ class IsolatePoolExecutor {
     }
   }
 
-  _runTask(ITask task) async {
-    final result = task._task.makeResult();
+  Future<_TaskResult> _runTask(Cancellable cancellable, _Task task) async {
+    final result = task.makeResult();
     try {
-      dynamic r = task._task.function(task._task.message);
+      dynamic r = task.function(cancellable, task.message);
       if (r is Future) {
         r = await r;
       }
@@ -248,8 +324,9 @@ class IsolatePoolExecutor {
       result.err = e;
       result.stackTrace = st;
     } finally {
-      task._submit(result);
+      // task._submit(result);
     }
+    return result;
   }
 
   void _poolTask() {
@@ -364,10 +441,17 @@ class IsolatePoolExecutor {
     args[0] = receivePort.sendPort;
     if (!isCore) args[1] = keepAliveTime;
 
+    String debugLabel = '';
+    assert(() {
+      debugLabel =
+          'IsolatePoolExecutor-${this.debugLabel ?? ''}-${_isolateIndex++}-worker';
+      return true;
+    }());
+
     Isolate.spawn(_worker, args,
             onError: watchDogPort.sendPort,
             onExit: watchDogPort.sendPort,
-            debugName: 'IsolatePoolExecutor-${_isolateIndex++}-worker')
+            debugName: debugLabel)
         .catchError(
       (_) {
         final task = executor.close();
@@ -388,12 +472,13 @@ void _worker(List args) {
   ReceivePort receivePort = ReceivePort();
   sendPort.send(receivePort.sendPort);
 
-  Future<_TaskResult> invokeTask(_Task task) async {
+  Future<_TaskResult> invokeTask(
+      _Task task, _TaskResult result, Cancellable cancellable) async {
     // print('$task ${task.message}');
     final taskResult = task.makeResult();
     try {
       final function = task.function;
-      dynamic result = function(task.message);
+      dynamic result = function(cancellable, task.message);
       if (result is Future) {
         result = await result;
       }
@@ -408,27 +493,75 @@ void _worker(List args) {
     }
   }
 
-  if (duration == null) {
-    receivePort
-        .listen((message) async => sendPort.send(await invokeTask(message)));
-    // } else if (duration == const Duration()) {
-    //   //立即退出
-    //   receivePort.listen((message) async {
-    //     final result = await invokeTask(message);
-    //     Isolate.exit(sendPort, result);
-    //   });
-  } else {
-    Timer? exitTimer;
-    final exitDuration = duration;
-    receivePort.listen((message) async {
-      exitTimer?.cancel();
-      exitTimer = null;
-      try {
-        final result = await invokeTask(message);
-        sendPort.send(result);
-      } finally {
-        exitTimer = Timer(exitDuration, () => Isolate.exit());
-      }
-    });
+  Timer? exitTimer;
+  final whenStart = duration == null || duration == const Duration()
+      ? () {}
+      : () {
+          exitTimer?.cancel();
+          exitTimer = null;
+        };
+  final whenEnd = duration == null
+      ? (_TaskResult result) => sendPort.send(result)
+      : duration == const Duration()
+          ? (_TaskResult result) => Isolate.exit(sendPort, result)
+          : (_TaskResult result) {
+              sendPort.send(result);
+              exitTimer = Timer(duration, () => Isolate.exit());
+            };
+
+  Future<void> invokeTaskT(
+      _Task task, _TaskResult result, Cancellable cancellable) async {
+    whenStart();
+    await Future.delayed(const Duration());
+    if (cancellable.isUnavailable) {
+      result.err = CancelledException();
+      whenEnd(result);
+      return;
+    }
+    try {
+      result = await invokeTask(task, result, cancellable);
+    } finally {
+      whenEnd(result);
+    }
   }
+
+  _Task? task;
+  Cancellable? cancellable;
+  receivePort.listen((message) {
+    if (message is _Task) {
+      cancellable = Cancellable();
+      task = message;
+      final result = message.makeResult();
+      cancellable?.onCancel.then((value) {
+        result.err = CancelledException(value);
+        sendPort.send(result);
+      });
+      invokeTaskT(task!, result, cancellable!);
+    } else if (message is int && message == task?.taskId) {
+      cancellable?.cancel();
+    }
+  });
+
+  // if (duration == null) {
+  //   receivePort.listen((message) async {
+  //     sendPort.send(await invokeTask(message));
+  //   });
+  // } else if (duration == const Duration()) {
+  //   //立即退出
+  //   receivePort.listen((message) async {
+  //     final result = await invokeTask(message);
+  //     Isolate.exit(sendPort, result);
+  //   });
+  // } else {
+  //   receivePort.listen((message) async {
+  //     exitTimer?.cancel();
+  //     exitTimer = null;
+  //     try {
+  //       final result = await invokeTask(message);
+  //       sendPort.send(result);
+  //     } finally {
+  //       exitTimer = Timer(exitDuration, () => Isolate.exit());
+  //     }
+  //   });
+  // }
 }
