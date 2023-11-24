@@ -92,37 +92,30 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
     final completer = Completer<SendPort>();
     final receivePort = ReceivePort();
 
-    final watchDogPort = ReceivePort();
-    _IsolateExecutor executor =
-        _IsolateExecutor(completer.future, watchDogPort, receivePort);
+    _IsolateExecutor executor = _IsolateExecutor(completer.future, receivePort);
 
-    watchDogPort.listen((message) {
+    receivePort.listen((message) {
       if (message == null) {
         //执行了Isolate exit
+        executor.task?._submitError(
+            RemoteError("Computation ended without result", ""),
+            StackTrace.empty);
+        executor.close();
+      } else if (message is SendPort) {
+        if (!completer.isCompleted) completer.complete(message);
+        return;
       } else if (message is _TaskResult) {
-        // 正常退出
         _TaskResult result = message;
         taskQueue[result.taskId]?._submit(result);
       }
-      executor.close();
-    });
-
-    receivePort.listen((message) {
-      if (message is SendPort && !completer.isCompleted) {
-        completer.complete(message);
-        return;
-      }
-      if (message is! _TaskResult) return;
-      _TaskResult result = message;
-      taskQueue[result.taskId]?._submit(result);
     });
     final args = List<dynamic>.filled(2, null);
     args[0] = receivePort.sendPort;
     args[1] = taskQueueFactory;
     args[2] = isolateValues;
     Isolate.spawn(_workerSingle, args,
-            onError: watchDogPort.sendPort,
-            onExit: watchDogPort.sendPort,
+            onError: receivePort.sendPort,
+            onExit: receivePort.sendPort,
             debugName: 'SingleIsolatePoolExecutor-worker')
         .then((value) => executor.isolate = value);
 
@@ -142,24 +135,8 @@ void _workerSingle(List args) {
   ReceivePort receivePort = ReceivePort();
   sendPort.send(receivePort.sendPort);
   if (taskQueueFactory == null) {
-    void invokeTask1(_Task task) async {
-      final taskResult = task.makeResult();
-      try {
-        final function = task.function;
-        dynamic result = function(task.message);
-        if (result is Future) {
-          result = await result;
-        }
-        taskResult.result = result;
-      } catch (err, stackTrace) {
-        taskResult.err = err;
-        taskResult.stackTrace = stackTrace;
-      } finally {
-        sendPort.send(taskResult);
-      }
-    }
-
-    receivePort.listen((message) => invokeTask1(message));
+    receivePort
+        .listen((message) async => sendPort.send(await _invokeTask(message)));
   } else {
     Queue<ITask> taskQueue = taskQueueFactory();
     _Task? doingTask;
@@ -167,25 +144,10 @@ void _workerSingle(List args) {
     late void Function() _poolTask;
 
     void invokeTask(_Task task) async {
-      // print('$task ${task.message}');
-      final taskResult = task.makeResult();
-      try {
-        final function = task.function;
-        dynamic result = function(task.message);
-        if (result is Future) {
-          result = await result;
-        }
-        taskResult.result = result;
-        // print('in isolate   ${result}');
-      } catch (err, stackTrace) {
-        taskResult.err = err;
-        taskResult.stackTrace = stackTrace;
-        // print('in isolate   ${err}');
-      } finally {
-        sendPort.send(taskResult);
-        doingTask = null;
-        _poolTask();
-      }
+      final taskResult = await _invokeTask(task);
+      sendPort.send(taskResult);
+      doingTask = null;
+      _poolTask();
     }
 
     _poolTask = () {

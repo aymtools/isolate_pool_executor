@@ -5,36 +5,22 @@ extension _IsolatePoolExecutorCoreNoCache on _IsolatePoolExecutorCore {
     final completer = Completer<SendPort>();
     final receivePort = ReceivePort();
 
-    final watchDogPort = ReceivePort();
-    _IsolateExecutor executor =
-        _IsolateExecutor(completer.future, watchDogPort, receivePort);
-
-    watchDogPort.listen((message) {
-      final task = executor.task;
-      if (message == null) {
-        // onExit handler message, isolate terminated without sending result.
-        task?._submitError(RemoteError("Computation ended without result", ""),
-            StackTrace.empty);
-      } else if (message is _TaskResult) {
-        task?._submit(message);
-      }
-      executor.close();
-    });
+    _IsolateExecutor executor = _IsolateExecutor(completer.future, receivePort);
 
     receivePort.listen((message) {
-      if (message is SendPort) {
-        if (!completer.isCompleted) completer.complete(message);
-        return;
-      }
-      final task = executor.task;
       if (message == null) {
         // onExit handler message, isolate terminated without sending result.
-        task?._submitError(RemoteError("Computation ended without result", ""),
+        executor.task?._submitError(
+            RemoteError("Computation ended without result", ""),
             StackTrace.empty);
+      } else if (message is SendPort) {
+        if (!completer.isCompleted) completer.complete(message);
+        return;
       } else if (message is _TaskResult) {
-        task?._submit(message);
+        executor.task?._submit(message);
       }
       executor.close();
+      _poolTask();
     });
 
     final args = List<dynamic>.filled(3, null);
@@ -44,7 +30,7 @@ extension _IsolatePoolExecutorCoreNoCache on _IsolatePoolExecutorCore {
     Isolate.spawn(_workerNoCache, args,
             onError: receivePort.sendPort,
             onExit: receivePort.sendPort,
-            debugName: 'IsolatePoolExecutor-${_isolateIndex++}-worker')
+            debugName: 'IsolatePoolExecutor-NoCache-${_isolateIndex++}-worker')
         .then((value) => executor.isolate = value)
         .catchError(
       (_) {
@@ -68,26 +54,9 @@ void _workerNoCache(List args) {
   ReceivePort receivePort = ReceivePort();
   sendPort.send(receivePort.sendPort);
 
-  Future<_TaskResult> invokeTask(_Task task) async {
-    final taskResult = task.makeResult();
-    try {
-      final function = task.function;
-      dynamic result = function(task.message);
-      if (result is Future) {
-        result = await result;
-      }
-      taskResult.result = result;
-    } catch (err, stackTrace) {
-      taskResult.err = err;
-      taskResult.stackTrace = stackTrace;
-    } finally {
-      return taskResult;
-    }
-  }
-
   receivePort.listen((message) async {
     receivePort.close();
-    final result = await invokeTask(message);
+    final result = await _invokeTask(message);
     Isolate.exit(sendPort, result);
   });
 }

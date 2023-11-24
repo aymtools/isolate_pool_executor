@@ -6,6 +6,7 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
 
   ///Isolate池中允许的最大Isolate数。如果当前阻塞队列满了，且继续提交任务，则创建新的Isolate执行任务，前提是当前Isolate数小于maximumPoolSize；当阻塞队列是无界队列, 则maximumPoolSize则不起作用, 因为无法提交至核心Isolate池的线程会一直持续地放入taskQueue.
   final int maximumPoolSize;
+  final int cachePoolSize;
 
   ///Isolate空闲时的存活时间，即当Isolate没有任务执行时，该Isolate继续存活的时间；该参数只在Isolate数大于corePoolSize时才有用, 超过这个时间的空闲线程将被终止；
   final Duration keepAliveTime;
@@ -32,6 +33,7 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
       required this.handler,
       this.isolateValues})
       : _coreExecutor = List.filled(corePoolSize, null),
+        cachePoolSize = maximumPoolSize - corePoolSize,
         _cacheExecutor = [],
         assert(maximumPoolSize >= corePoolSize,
             'must maximumPoolSize >= corePoolSize');
@@ -120,8 +122,14 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
     }
   }
 
-  void _poolTask() {
+  void _poolTask([_IsolateExecutor? executorIdle]) {
     scheduleMicrotask(() {
+      if (executorIdle != null && executorIdle.isIdle && taskQueue.isNotEmpty) {
+        final task = taskQueue.removeFirst();
+        executorIdle.emit(task);
+        return;
+      }
+
       while (taskQueue.isNotEmpty) {
         final executor = _findIdleExecutor();
         if (executor == null) {
@@ -146,25 +154,17 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
         return e;
       }
     }
-
-    i = 0;
-    j = maximumPoolSize - corePoolSize;
-    if (j == 0) return null;
-    int k = _cacheExecutor.length;
-    for (; i < k && i < j; i++) {
-      final e = _cacheExecutor[i];
-      if (e.isIdle) {
-        return e;
-      }
-    }
-    if (i == j) {
+    if (cachePoolSize == 0) return null;
+    final idleExecutor = _cacheExecutor.firstWhereOrNull((e) => e.isIdle);
+    if (idleExecutor != null) return idleExecutor;
+    if (_cacheExecutor.length == cachePoolSize) {
       return null;
     }
     _IsolateExecutor executor = keepAliveTime == Duration.zero
         ? _makeNoCacheExecutor()
         : _makeExecutor(false);
-    _cacheExecutor.add(executor);
     executor.whenClose = () => _cacheExecutor.remove(executor);
+    _cacheExecutor.add(executor);
     return executor;
   }
 
@@ -172,11 +172,9 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
     final completer = Completer<SendPort>();
     final receivePort = ReceivePort();
 
-    final watchDogPort = ReceivePort();
-    _IsolateExecutor executor =
-        _IsolateExecutor(completer.future, watchDogPort, receivePort);
+    _IsolateExecutor executor = _IsolateExecutor(completer.future, receivePort);
 
-    watchDogPort.listen((message) {
+    receivePort.listen((message) {
       if (message == null) {
         //执行了Isolate exit
         final task = executor.close();
@@ -186,14 +184,17 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
           _addTask(task, header: true);
         }
         return;
+      } else if (message is SendPort) {
+        if (!completer.isCompleted) completer.complete(message);
+        return;
       } else if (message is _TaskResult) {
-        // 正常退出
         executor.submit(message);
-        executor.close();
+
         if (_shutdown && isCore && taskQueue.isEmpty) {
+          executor.close();
           return;
         }
-        _poolTask();
+        _poolTask(executor);
       } else if (message is List && message.length == 2) {
         //发生了异常退出
         final task = executor.close();
@@ -214,32 +215,16 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
       }
     });
 
-    receivePort.listen((message) {
-      if (message is SendPort && !completer.isCompleted) {
-        completer.complete(message);
-        return;
-      }
-      if (message is! _TaskResult) return;
-      _TaskResult result = message;
-      executor.submit(result);
-      // print(
-      //     '_shutdown $_shutdown isCore $isCore taskQueue.isEmpty ${taskQueue.isEmpty}');
-      if (_shutdown && isCore && taskQueue.isEmpty) {
-        executor.close();
-        return;
-      }
-      _poolTask();
-    });
-
     final args = List<dynamic>.filled(3, null);
     args[0] = receivePort.sendPort;
     if (!isCore) args[1] = keepAliveTime;
     args[2] = isolateValues;
 
     Isolate.spawn(_worker, args,
-            onError: watchDogPort.sendPort,
-            onExit: watchDogPort.sendPort,
-            debugName: 'IsolatePoolExecutor-${_isolateIndex++}-worker')
+            onError: receivePort.sendPort,
+            onExit: receivePort.sendPort,
+            debugName:
+                'IsolatePoolExecutor-${isCore ? 'Core' : 'NoCore'}-${_isolateIndex++}-worker')
         .then((value) => executor.isolate = value)
         .catchError(
       (_) {
@@ -265,29 +250,9 @@ void _worker(List args) {
   ReceivePort receivePort = ReceivePort();
   sendPort.send(receivePort.sendPort);
 
-  Future<_TaskResult> invokeTask(_Task task) async {
-    // print('$task ${task.message}');
-    final taskResult = task.makeResult();
-    try {
-      final function = task.function;
-      dynamic result = function(task.message);
-      if (result is Future) {
-        result = await result;
-      }
-      taskResult.result = result;
-      // print('in isolate   ${result}');
-    } catch (err, stackTrace) {
-      taskResult.err = err;
-      taskResult.stackTrace = stackTrace;
-      // print('in isolate   ${err}');
-    } finally {
-      return taskResult;
-    }
-  }
-
   if (duration == null) {
     receivePort
-        .listen((message) async => sendPort.send(await invokeTask(message)));
+        .listen((message) async => sendPort.send(await _invokeTask(message)));
   } else {
     Timer? exitTimer;
     final exitDuration = duration;
@@ -295,7 +260,7 @@ void _worker(List args) {
       exitTimer?.cancel();
       exitTimer = null;
       try {
-        final result = await invokeTask(message);
+        final result = await _invokeTask(message);
         sendPort.send(result);
       } finally {
         exitTimer = Timer(exitDuration, () => Isolate.exit());

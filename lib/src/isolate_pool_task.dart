@@ -79,7 +79,6 @@ class _Task {
 
 class _IsolateExecutor {
   final Future<SendPort> sendPort;
-  final ReceivePort watchDog;
   final ReceivePort receivePort;
   void Function()? whenClose;
   bool isClosed = false;
@@ -87,7 +86,7 @@ class _IsolateExecutor {
 
   ITask? task;
 
-  _IsolateExecutor(this.sendPort, this.watchDog, this.receivePort);
+  _IsolateExecutor(this.sendPort, this.receivePort);
 
   bool get isIdle => task == null;
 
@@ -115,9 +114,34 @@ class _IsolateExecutor {
     whenClose?.call();
     task = null;
     receivePort.close();
-    watchDog.close();
     isolate?.kill();
     whenClose = null;
     return t?._task == null ? null : t;
+  }
+}
+
+Future<_TaskResult> _invokeTask(_Task task) async {
+  final taskResult = task.makeResult();
+  try {
+    final function = task.function;
+    dynamic result = function(task.message);
+    if (result is Future) {
+      result = await result;
+    }
+    taskResult.result = result;
+  } catch (err, stackTrace) {
+    taskResult.err = err;
+    taskResult.stackTrace = stackTrace;
+  } finally {
+    return taskResult;
+  }
+}
+
+extension _ListFirstWhereOrNullExt<E> on List<E> {
+  E? firstWhereOrNull(bool test(E element)) {
+    for (E element in this) {
+      if (test(element)) return element;
+    }
+    return null;
   }
 }
