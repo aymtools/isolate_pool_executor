@@ -10,3 +10,8 @@
 
 * 增加isolate初始化时存入map values
 * keepAliveTime为0时优化isolate的退出机制
+* 优化isolate之间的数据传
+
+## 1.0.3
+
+* 优化IsolateNoCache的通信次数，使性能接近Isolate.run

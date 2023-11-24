@@ -70,12 +70,13 @@ abstract class IsolatePoolExecutor {
 
   ///
   factory IsolatePoolExecutor.newCachedIsolatePool(
-          {Map<Object, Object?>? isolateValues}) =>
+          {Duration keepAliveTime = const Duration(seconds: 10),
+          Map<Object, Object?>? isolateValues}) =>
       _IsolatePoolExecutorCore(
           corePoolSize: 0,
           // java中int最大值 魔法数
           maximumPoolSize: 2147483647,
-          keepAliveTime: const Duration(seconds: 1),
+          keepAliveTime: keepAliveTime,
           taskQueue: Queue(),
           handler: RejectedExecutionHandler.abortPolicy,
           isolateValues: isolateValues);
