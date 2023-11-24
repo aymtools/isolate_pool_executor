@@ -234,6 +234,7 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
             onError: watchDogPort.sendPort,
             onExit: watchDogPort.sendPort,
             debugName: 'IsolatePoolExecutor-${_isolateIndex++}-worker')
+        .then((value) => executor.isolate = value)
         .catchError(
       (_) {
         final task = executor.close();
@@ -241,7 +242,7 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
           _addTask(task, header: true);
         }
       },
-    ).then((value) => executor.isolate = value);
+    );
 
     return executor;
   }

@@ -1,6 +1,6 @@
 part of 'isolate_pool_executor.dart';
 
-Queue<ITask> _defaultTaskQueueFactory() => Queue();
+// Queue<ITask> _defaultTaskQueueFactory() => Queue();
 
 class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
   final Queue<ITask> Function()? taskQueueFactory;
@@ -145,8 +145,9 @@ void _workerSingle(List args) {
       } finally {
         sendPort.send(taskResult);
       }
-      receivePort.listen((message) => invokeTask1(message));
     }
+
+    receivePort.listen((message) => invokeTask1(message));
   } else {
     Queue<ITask> taskQueue = taskQueueFactory();
     _Task? doingTask;
