@@ -15,6 +15,7 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
 
   ///Isolate池的饱和策略，当阻塞队列满了，且没有空闲的工作Isolate，如果继续提交任务，必须采取一种策略处理该任务
   final RejectedExecutionHandler handler;
+  final Map<Object, Object?>? isolateValues;
 
   final List<_IsolateExecutor?> _coreExecutor;
   final List<_IsolateExecutor> _cacheExecutor;
@@ -28,7 +29,8 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
       required this.maximumPoolSize,
       required this.keepAliveTime,
       required this.taskQueue,
-      required this.handler})
+      required this.handler,
+      this.isolateValues})
       : _coreExecutor = List.filled(corePoolSize, null),
         _cacheExecutor = [],
         assert(maximumPoolSize >= corePoolSize,
@@ -158,7 +160,9 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
     if (i == j) {
       return null;
     }
-    _IsolateExecutor executor = _makeExecutor(false);
+    _IsolateExecutor executor = keepAliveTime == Duration.zero
+        ? _makeNoCacheExecutor()
+        : _makeExecutor(false);
     _cacheExecutor.add(executor);
     executor.whenClose = () => _cacheExecutor.remove(executor);
     return executor;
@@ -213,6 +217,7 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
     receivePort.listen((message) {
       if (message is SendPort && !completer.isCompleted) {
         completer.complete(message);
+        return;
       }
       if (message is! _TaskResult) return;
       _TaskResult result = message;
@@ -226,9 +231,10 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
       _poolTask();
     });
 
-    final args = List<dynamic>.filled(2, null);
+    final args = List<dynamic>.filled(3, null);
     args[0] = receivePort.sendPort;
     if (!isCore) args[1] = keepAliveTime;
+    args[2] = isolateValues;
 
     Isolate.spawn(_worker, args,
             onError: watchDogPort.sendPort,
@@ -251,6 +257,10 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
 void _worker(List args) {
   SendPort sendPort = args[0];
   Duration? duration = args[1];
+  final isolateValues = args[2];
+  if (isolateValues != null) {
+    _isolateValues.addAll(isolateValues as Map<Object, Object?>);
+  }
 
   ReceivePort receivePort = ReceivePort();
   sendPort.send(receivePort.sendPort);
@@ -278,12 +288,6 @@ void _worker(List args) {
   if (duration == null) {
     receivePort
         .listen((message) async => sendPort.send(await invokeTask(message)));
-    // } else if (duration == const Duration()) {
-    //   //立即退出
-    //   receivePort.listen((message) async {
-    //     final result = await invokeTask(message);
-    //     Isolate.exit(sendPort, result);
-    //   });
   } else {
     Timer? exitTimer;
     final exitDuration = duration;

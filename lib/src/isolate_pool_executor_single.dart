@@ -4,15 +4,20 @@ part of 'isolate_pool_executor.dart';
 
 class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
   final Queue<ITask> Function()? taskQueueFactory;
+
+  final Map<Object, Object?>? isolateValues;
+  final List<_IsolateExecutor?> _coreExecutor = List.filled(1, null);
+
+  final Map<int, ITask> taskQueue = {};
+
   bool _shutdown = false;
 
-  final List<_IsolateExecutor?> _coreExecutor = List.filled(1, null);
-  final Map<int, ITask> taskQueue = {};
   late final void Function(
           _IsolateExecutor executor, ITask task, int what, dynamic tag)
       _emitTask = taskQueueFactory == null ? _emitTask2 : _emitTask1;
 
-  _IsolatePoolSingleExecutor({Queue<ITask> Function()? taskQueueFactory})
+  _IsolatePoolSingleExecutor(
+      {Queue<ITask> Function()? taskQueueFactory, this.isolateValues})
       : taskQueueFactory = taskQueueFactory;
 
   @override
@@ -105,6 +110,7 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
     receivePort.listen((message) {
       if (message is SendPort && !completer.isCompleted) {
         completer.complete(message);
+        return;
       }
       if (message is! _TaskResult) return;
       _TaskResult result = message;
@@ -113,6 +119,7 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
     final args = List<dynamic>.filled(2, null);
     args[0] = receivePort.sendPort;
     args[1] = taskQueueFactory;
+    args[2] = isolateValues;
     Isolate.spawn(_workerSingle, args,
             onError: watchDogPort.sendPort,
             onExit: watchDogPort.sendPort,
@@ -126,6 +133,11 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
 void _workerSingle(List args) {
   SendPort sendPort = args[0];
   Queue<ITask> Function()? taskQueueFactory = args[1];
+
+  final isolateValues = args[2];
+  if (isolateValues != null) {
+    _isolateValues.addAll(isolateValues as Map<Object, Object?>);
+  }
 
   ReceivePort receivePort = ReceivePort();
   sendPort.send(receivePort.sendPort);
