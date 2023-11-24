@@ -97,9 +97,13 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
     receivePort.listen((message) {
       if (message == null) {
         //执行了Isolate exit
-        executor.task?._submitError(
-            RemoteError("Computation ended without result", ""),
-            StackTrace.empty);
+        final task = executor.task;
+        if (task != null) {
+          task._submitError(
+              RemoteError("Computation ended without result", ""),
+              StackTrace.empty);
+          taskQueue.remove(task.taskId);
+        }
         executor.close();
       } else if (message is SendPort) {
         if (!completer.isCompleted) completer.complete(message);
@@ -107,9 +111,13 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
       } else if (message is _TaskResult) {
         _TaskResult result = message;
         taskQueue[result.taskId]?._submit(result);
+        taskQueue.remove(result.taskId);
+        if (_shutdown && taskQueue.isEmpty) {
+          executor.close();
+        }
       }
     });
-    final args = List<dynamic>.filled(2, null);
+    final args = List<dynamic>.filled(3, null);
     args[0] = receivePort.sendPort;
     args[1] = taskQueueFactory;
     args[2] = isolateValues;
