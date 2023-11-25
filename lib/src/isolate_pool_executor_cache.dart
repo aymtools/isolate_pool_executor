@@ -19,12 +19,12 @@ extension _IsolatePoolExecutorCoreNoCache on _IsolatePoolExecutorCore {
               onExit: receivePort.sendPort,
               debugName:
                   'IsolatePoolExecutor-NoCache-${_isolateIndex++}-worker')
-          .then((value) => executor.isolate = value)
-          .catchError(
-        (err, st) {
+          .then(
+        (value) => executor.isolate = value,
+        onError: (error, stackTrace) {
           final task = executor.close();
           if (task != null) {
-            task._submitError(err, st);
+            task._submitError(error, stackTrace);
           }
         },
       );

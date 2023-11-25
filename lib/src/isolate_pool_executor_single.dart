@@ -99,8 +99,7 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
         //执行了Isolate exit
         final task = executor.task;
         if (task != null) {
-          task._submitError(
-              RemoteError("Computation ended without result", ""),
+          task._submitError(RemoteError("Computation ended without result", ""),
               StackTrace.empty);
           taskQueue.remove(task.taskId);
         }
