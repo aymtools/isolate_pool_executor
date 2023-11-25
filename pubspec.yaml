@@ -1,7 +1,11 @@
 name: isolate_pool_executor
 description: isolate pool executor for Dart.
-version: 1.0.3
+version: 1.0.3+1
 homepage: https://github.com/aymtools/isolate_pool_executor
+topics:
+  - isolate
+  - isolate-pool
+  - pool
 
 environment:
   sdk: '>=2.15.0 <4.0.0'
