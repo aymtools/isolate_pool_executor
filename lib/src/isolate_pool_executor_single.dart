@@ -62,7 +62,12 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
     message[2] = tag;
     executor.sendPort.then((value) {
       if (!executor.isClosed) {
-        value.send(message);
+        try {
+          value.send(message);
+        } catch (err, st) {
+          task._submitError(err, st);
+          executor.close();
+        }
       }
     });
   }
@@ -73,7 +78,12 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
     task._task = null;
     executor.sendPort.then((value) {
       if (!executor.isClosed) {
-        value.send(t);
+        try {
+          value.send(t);
+        } catch (err, st) {
+          task._submitError(err, st);
+          executor.close();
+        }
       }
     });
   }
@@ -114,6 +124,23 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
         if (_shutdown && taskQueue.isEmpty) {
           executor.close();
         }
+      } else if (message is List && message.length == 2) {
+        //发生了异常退出
+        final task = executor.close();
+        if (task != null) {
+          var remoteError = message[0];
+          var remoteStack = message[1];
+          if (remoteStack is StackTrace) {
+            // Typed error.
+            task._submitError(remoteError!, remoteStack);
+          } else {
+            // onError handler message, uncaught async error.
+            // Both values are strings, so calling `toString` is efficient.
+            var error = RemoteError(
+                remoteError.toString(), remoteStack?.toString() ?? '');
+            task._submitError(error, error.stackTrace);
+          }
+        }
       }
     });
     final args = List<dynamic>.filled(3, null);
@@ -132,49 +159,51 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
 
 void _workerSingle(List args) {
   SendPort sendPort = args[0];
-  Queue<ITask> Function()? taskQueueFactory = args[1];
+  _runIsolateWorkGuarded(sendPort, () {
+    Queue<ITask> Function()? taskQueueFactory = args[1];
 
-  final isolateValues = args[2];
-  if (isolateValues != null) {
-    _isolateValues.addAll(isolateValues as Map<Object, Object?>);
-  }
-
-  ReceivePort receivePort = ReceivePort();
-  sendPort.send(receivePort.sendPort);
-  if (taskQueueFactory == null) {
-    receivePort
-        .listen((message) async => sendPort.send(await _invokeTask(message)));
-  } else {
-    Queue<ITask> taskQueue = taskQueueFactory();
-    _Task? doingTask;
-
-    late void Function() _poolTask;
-
-    void invokeTask(_Task task) async {
-      final taskResult = await _invokeTask(task);
-      sendPort.send(taskResult);
-      doingTask = null;
-      _poolTask();
+    final isolateValues = args[2];
+    if (isolateValues != null) {
+      _isolateValues.addAll(isolateValues as Map<Object, Object?>);
     }
 
-    _poolTask = () {
-      scheduleMicrotask(() {
-        while (doingTask == null && taskQueue.isNotEmpty) {
-          final task = taskQueue.removeFirst();
-          doingTask = task._task;
-        }
-        if (doingTask != null) {
-          Timer.run(() => invokeTask(doingTask!));
-        }
-      });
-    };
+    ReceivePort receivePort = ReceivePort();
+    sendPort.send(receivePort.sendPort);
+    if (taskQueueFactory == null) {
+      receivePort
+          .listen((message) async => sendPort.send(await _invokeTask(message)));
+    } else {
+      Queue<ITask> taskQueue = taskQueueFactory();
+      _Task? doingTask;
 
-    receivePort.listen((message) {
-      List list = message;
-      scheduleMicrotask(() {
-        taskQueue.add(ITask._taskValue(list[0], list[1], list[2]));
+      late void Function() _poolTask;
+
+      void invokeTask(_Task task) async {
+        final taskResult = await _invokeTask(task);
+        sendPort.send(taskResult);
+        doingTask = null;
         _poolTask();
+      }
+
+      _poolTask = () {
+        scheduleMicrotask(() {
+          while (doingTask == null && taskQueue.isNotEmpty) {
+            final task = taskQueue.removeFirst();
+            doingTask = task._task;
+          }
+          if (doingTask != null) {
+            Timer.run(() => invokeTask(doingTask!));
+          }
+        });
+      };
+
+      receivePort.listen((message) {
+        List list = message;
+        scheduleMicrotask(() {
+          taskQueue.add(ITask._taskValue(list[0], list[1], list[2]));
+          _poolTask();
+        });
       });
-    });
-  }
+    }
+  });
 }

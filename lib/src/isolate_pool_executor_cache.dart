@@ -41,6 +41,23 @@ extension _IsolatePoolExecutorCoreNoCache on _IsolatePoolExecutorCore {
         return;
       } else if (message is _TaskResult) {
         executor.task?._submit(message);
+      } else if (message is List && message.length == 2) {
+        //发生了异常退出
+        final task = executor.close();
+        if (task != null) {
+          var remoteError = message[0];
+          var remoteStack = message[1];
+          if (remoteStack is StackTrace) {
+            // Typed error.
+            task._submitError(remoteError!, remoteStack);
+          } else {
+            // onError handler message, uncaught async error.
+            // Both values are strings, so calling `toString` is efficient.
+            var error = RemoteError(
+                remoteError.toString(), remoteStack?.toString() ?? '');
+            task._submitError(error, error.stackTrace);
+          }
+        }
       }
       executor.close();
       _poolTask();
@@ -52,10 +69,12 @@ extension _IsolatePoolExecutorCoreNoCache on _IsolatePoolExecutorCore {
 
 void _workerNoCache(List args) {
   SendPort sendPort = args[0];
-  _Task task = args[1];
-  final isolateValues = args[2];
-  if (isolateValues != null) {
-    _isolateValues.addAll(isolateValues as Map<Object, Object?>);
-  }
-  _invokeTask(task).then((result) => Isolate.exit(sendPort, result));
+  _runIsolateWorkGuarded(sendPort, () {
+    _Task task = args[1];
+    final isolateValues = args[2];
+    if (isolateValues != null) {
+      _isolateValues.addAll(isolateValues as Map<Object, Object?>);
+    }
+    _invokeTask(task).then((result) => Isolate.exit(sendPort, result));
+  });
 }

@@ -95,8 +95,13 @@ class _IsolateExecutor {
     sendPort.then((value) {
       if (!isClosed && task._task != null) {
         final t = task._task;
-        value.send(t);
-        task._task = null;
+        try {
+          value.send(t);
+          task._task = null;
+        } catch (err, st) {
+          task._submitError(err, st);
+          close();
+        }
       }
     });
   }
@@ -135,6 +140,15 @@ Future<_TaskResult> _invokeTask(_Task task) async {
   } finally {
     return taskResult;
   }
+}
+
+void _runIsolateWorkGuarded(SendPort sendPort, void Function() block) {
+  runZonedGuarded(block, (error, stack) {
+    final errs = List<Object?>.filled(2, null);
+    errs[0] = error;
+    errs[1] = stack;
+    Isolate.exit(sendPort, errs);
+  });
 }
 
 extension _ListFirstWhereOrNullExt<E> on List<E> {

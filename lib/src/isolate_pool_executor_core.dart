@@ -207,11 +207,12 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
           } else {
             // onError handler message, uncaught async error.
             // Both values are strings, so calling `toString` is efficient.
-            var error =
-                RemoteError(remoteError.toString(), remoteStack.toString());
+            var error = RemoteError(
+                remoteError.toString(), remoteStack?.toString() ?? '');
             task._submitError(error, error.stackTrace);
           }
         }
+        _poolTask();
       }
     });
 
@@ -241,30 +242,32 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
 
 void _worker(List args) {
   SendPort sendPort = args[0];
-  Duration? duration = args[1];
-  final isolateValues = args[2];
-  if (isolateValues != null) {
-    _isolateValues.addAll(isolateValues as Map<Object, Object?>);
-  }
+  _runIsolateWorkGuarded(sendPort, () {
+    Duration? duration = args[1];
+    final isolateValues = args[2];
+    if (isolateValues != null) {
+      _isolateValues.addAll(isolateValues as Map<Object, Object?>);
+    }
 
-  ReceivePort receivePort = ReceivePort();
-  sendPort.send(receivePort.sendPort);
+    ReceivePort receivePort = ReceivePort();
+    sendPort.send(receivePort.sendPort);
 
-  if (duration == null) {
-    receivePort
-        .listen((message) async => sendPort.send(await _invokeTask(message)));
-  } else {
-    Timer? exitTimer;
-    final exitDuration = duration;
-    receivePort.listen((message) async {
-      exitTimer?.cancel();
-      exitTimer = null;
-      try {
-        final result = await _invokeTask(message);
-        sendPort.send(result);
-      } finally {
-        exitTimer = Timer(exitDuration, () => Isolate.exit());
-      }
-    });
-  }
+    if (duration == null) {
+      receivePort
+          .listen((message) async => sendPort.send(await _invokeTask(message)));
+    } else {
+      Timer? exitTimer;
+      final exitDuration = duration;
+      receivePort.listen((message) async {
+        exitTimer?.cancel();
+        exitTimer = null;
+        try {
+          final result = await _invokeTask(message);
+          sendPort.send(result);
+        } finally {
+          exitTimer = Timer(exitDuration, () => Isolate.exit());
+        }
+      });
+    }
+  });
 }
