@@ -24,3 +24,8 @@
 
 * 当send task失败时抛出异常
 * isolate中的worker增加全局异常捕获
+
+## 1.0.6
+
+* newCachedIsolatePool的队列修正为QueueEmpty不可添加任何任务
+

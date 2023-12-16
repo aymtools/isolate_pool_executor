@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:isolate';
 
+import 'package:isolate_pool_executor/src/queue/queue_empty.dart';
+
 part 'isolate_pool_task.dart';
 
 part 'isolate_pool_executor_core.dart';
@@ -77,7 +79,7 @@ abstract class IsolatePoolExecutor {
           // java中int最大值 魔法数
           maximumPoolSize: 2147483647,
           keepAliveTime: keepAliveTime,
-          taskQueue: Queue(),
+          taskQueue: QueueEmpty(),
           handler: RejectedExecutionHandler.abortPolicy,
           isolateValues: isolateValues);
 
