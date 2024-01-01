@@ -12,9 +12,10 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
 
   bool _shutdown = false;
 
-  late final void Function(
-          _IsolateExecutor executor, ITask task, int what, dynamic tag)
-      _emitTask = taskQueueFactory == null ? _emitTask2 : _emitTask1;
+  List<ITask> creatingCache = [];
+
+  late final void Function(ITask task, int what, dynamic tag) _emitTask =
+      taskQueueFactory == null ? _emitTask2 : _emitTask1;
 
   _IsolatePoolSingleExecutor(
       {Queue<ITask> Function()? taskQueueFactory, this.isolateValues})
@@ -47,75 +48,100 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
     ITask<R> task = ITask<R>._task(run, p, debugLabel, what, tag);
     taskQueue[task.taskId] = task;
 
-    final executor = _findExecutor();
-    _emitTask(executor, task, what, tag);
+    _emitTask(task, what, tag);
     return task;
   }
 
-  void _emitTask1(
-      _IsolateExecutor executor, ITask task, int what, dynamic tag) {
+  void _emitTask1(ITask task, int what, dynamic tag) {
     final t = task._task;
-    task._task = null;
     final message = List<dynamic>.filled(3, null);
     message[0] = t;
     message[1] = what;
     message[2] = tag;
-    executor.sendPort.then((value) {
-      if (!executor.isClosed) {
-        try {
-          value.send(message);
-        } catch (err, st) {
-          task._submitError(err, st);
-          executor.close();
-        }
-      }
-    });
-  }
 
-  void _emitTask2(
-      _IsolateExecutor executor, ITask task, int what, dynamic tag) {
-    final t = task._task;
-    task._task = null;
-    executor.sendPort.then((value) {
-      if (!executor.isClosed) {
-        try {
-          value.send(t);
-        } catch (err, st) {
-          task._submitError(err, st);
-          executor.close();
-        }
-      }
-    });
-  }
-
-  _IsolateExecutor _findExecutor() {
     var executor = _coreExecutor[0];
     if (executor == null) {
-      executor = _makeExecutor();
+      executor = _makeExecutor(task);
       _coreExecutor[0] = executor;
       executor.whenClose = () => _coreExecutor[0] = null;
-    }
-    return executor;
+      task._task = null;
+    } else if (executor.isCreating) {
+      creatingCache.add(task);
+    } else if (!executor.isClosed) {
+      try {
+        executor._sendPort!.send(message);
+        task._task = null;
+      } catch (err, st) {
+        task._submitError(err, st);
+        executor.close();
+      }
+    } else {}
   }
 
-  _IsolateExecutor _makeExecutor() {
-    final completer = Completer<SendPort>();
-    final receivePort = ReceivePort();
+  void _emitTask2(ITask task, int what, dynamic tag) {
+    final t = task._task;
 
-    _IsolateExecutor executor = _IsolateExecutor(completer.future, receivePort);
+    var executor = _coreExecutor[0];
+    if (executor == null) {
+      executor = _makeExecutor(task);
+      _coreExecutor[0] = executor;
+      executor.whenClose = () => _coreExecutor[0] = null;
+      task._task = null;
+    } else if (executor.isCreating) {
+      creatingCache.add(task);
+    } else if (!executor.isClosed) {
+      try {
+        executor._sendPort!.send(t);
+        task._task = null;
+      } catch (err, st) {
+        task._submitError(err, st);
+        executor.close();
+      }
+    } else {}
+  }
+
+  _IsolateExecutor _makeExecutor(ITask fistTask) {
+    final receivePort = ReceivePort();
+    String? debugLabel;
+
+    assert(() {
+      debugLabel = 'SingleIsolatePoolExecutor-worker';
+      return true;
+    }());
+
+    _IsolateExecutor executor =
+        _IsolateExecutor(receivePort, fistTask, debugLabel);
 
     receivePort.listen((message) {
       if (message == null) {
         //执行了Isolate exit
-        final task = executor.task;
-        if (task != null) {
-          task._submitError(RemoteError("Computation ended without result", ""),
-              StackTrace.empty);
-          taskQueue.remove(task.taskId);
-        }
+        final err = RemoteError("Computation ended without result", "");
+        taskQueue.values.forEach((task) {
+          task._submitError(err, StackTrace.empty);
+        });
         executor.close();
+        taskQueue.clear();
+        creatingCache.clear();
       } else if (message is SendPort) {
-        if (!completer.isCompleted) completer.complete(message);
+        // if (!completer.isCompleted) completer.complete(message);
+        executor.sendPort = message;
+        if (taskQueueFactory == null) {
+          creatingCache.forEach((task) {
+            message.send(task._task!);
+            task._task = null;
+          });
+        } else {
+          creatingCache.forEach((task) {
+            final t = task._task;
+            final msg = List<dynamic>.filled(3, null);
+            msg[0] = t;
+            msg[1] = task.what;
+            msg[2] = task.tag;
+            message.send(msg);
+            task._task = null;
+          });
+        }
+        creatingCache.clear();
         return;
       } else if (message is _TaskResult) {
         _TaskResult result = message;
@@ -126,32 +152,41 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
         }
       } else if (message is List && message.length == 2) {
         //发生了异常退出
-        final task = executor.close();
-        if (task != null) {
-          var remoteError = message[0];
-          var remoteStack = message[1];
-          if (remoteStack is StackTrace) {
-            // Typed error.
-            task._submitError(remoteError!, remoteStack);
-          } else {
-            // onError handler message, uncaught async error.
-            // Both values are strings, so calling `toString` is efficient.
-            var error = RemoteError(
-                remoteError.toString(), remoteStack?.toString() ?? '');
-            task._submitError(error, error.stackTrace);
-          }
+        var remoteError = message[0];
+        var remoteStack = message[1];
+        if (remoteStack! is StackTrace) {
+          var error = RemoteError(
+              remoteError.toString(), remoteStack?.toString() ?? '');
+          remoteError = error;
+          remoteStack = error.stackTrace;
         }
+
+        taskQueue.values.forEach((task) {
+          task._submitError(remoteError, remoteStack);
+        });
+        executor.close();
+        taskQueue.clear();
+        creatingCache.clear();
       }
     });
-    final args = List<dynamic>.filled(3, null);
+    final args = List<dynamic>.filled(4, null);
     args[0] = receivePort.sendPort;
     args[1] = taskQueueFactory;
     args[2] = isolateValues;
+    args[3] = fistTask._task;
+
     Isolate.spawn(_workerSingle, args,
             onError: receivePort.sendPort,
             onExit: receivePort.sendPort,
-            debugName: 'SingleIsolatePoolExecutor-worker')
-        .then((value) => executor.isolate = value);
+            debugName: debugLabel)
+        .then((value) => executor._isolate = value)
+        .catchError(
+      (error, stackTrace) {
+        executor.close();
+        fistTask._submitError(error, stackTrace);
+        taskQueue.remove(fistTask.taskId);
+      },
+    );
 
     return executor;
   }
@@ -169,8 +204,13 @@ void _workerSingle(List args) {
 
     ReceivePort receivePort = ReceivePort();
     sendPort.send(receivePort.sendPort);
+
+    final _Task? task = args[3];
+
+    void Function() startListen;
+
     if (taskQueueFactory == null) {
-      receivePort
+      startListen = () => receivePort
           .listen((message) async => sendPort.send(await _invokeTask(message)));
     } else {
       Queue<ITask> taskQueue = taskQueueFactory();
@@ -196,14 +236,18 @@ void _workerSingle(List args) {
           }
         });
       };
-
-      receivePort.listen((message) {
-        List list = message;
-        scheduleMicrotask(() {
-          taskQueue.add(ITask._taskValue(list[0], list[1], list[2]));
-          _poolTask();
-        });
-      });
+      startListen = () => receivePort.listen((message) {
+            List list = message;
+            scheduleMicrotask(() {
+              taskQueue.add(ITask._taskValue(list[0], list[1], list[2]));
+              _poolTask();
+            });
+          });
+    }
+    if (task != null) {
+      _invokeTask(task).then(sendPort.send).then((_) => startListen());
+    } else {
+      startListen();
     }
   });
 }

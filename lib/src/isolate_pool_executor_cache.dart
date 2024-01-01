@@ -1,12 +1,15 @@
 part of 'isolate_pool_executor.dart';
 
 extension _IsolatePoolExecutorCoreNoCache on _IsolatePoolExecutorCore {
-  _IsolateExecutor _makeNoCacheExecutor() {
-    // final completer = Completer<SendPort>();
+  _IsolateExecutor _makeNoCacheExecutor(ITask task) {
     final receivePort = ReceivePort();
+    String? debugLabel;
+    assert(() {
+      debugLabel = 'IsolatePoolExecutor-NoCache-${_isolateIndex++}-worker';
+      return true;
+    }());
 
-    _IsolateExecutor executor =
-        _IsolateExecutor(Future.value(receivePort.sendPort), receivePort);
+    _IsolateExecutor executor = _IsolateExecutor(receivePort, task, debugLabel);
 
     void runIsolate(_Task task) {
       final args = List<dynamic>.filled(3, null);
@@ -17,10 +20,9 @@ extension _IsolatePoolExecutorCoreNoCache on _IsolatePoolExecutorCore {
       Isolate.spawn(_workerNoCache, args,
               onError: receivePort.sendPort,
               onExit: receivePort.sendPort,
-              debugName:
-                  'IsolatePoolExecutor-NoCache-${_isolateIndex++}-worker')
+              debugName: debugLabel)
           .then(
-        (value) => executor.isolate = value,
+        (value) => executor._isolate = value,
         onError: (error, stackTrace) {
           final task = executor.close();
           if (task != null) {
@@ -33,14 +35,14 @@ extension _IsolatePoolExecutorCoreNoCache on _IsolatePoolExecutorCore {
     receivePort.listen((message) {
       if (message == null) {
         // onExit handler message, isolate terminated without sending result.
-        executor.task?._submitError(
+        executor._task?._submitError(
             RemoteError("Computation ended without result", ""),
             StackTrace.empty);
       } else if (message is _Task) {
         runIsolate(message);
         return;
       } else if (message is _TaskResult) {
-        executor.task?._submit(message);
+        executor._task?._submit(message);
       } else if (message is List && message.length == 2) {
         //发生了异常退出
         final task = executor.close();
@@ -62,7 +64,7 @@ extension _IsolatePoolExecutorCoreNoCache on _IsolatePoolExecutorCore {
       executor.close();
       _poolTask();
     });
-
+    runIsolate(task._task!);
     return executor;
   }
 }

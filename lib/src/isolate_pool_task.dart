@@ -77,49 +77,65 @@ class _Task {
   _TaskResult makeResult() => _TaskResult(taskLabel, taskId);
 }
 
+enum IsolateExecutorState {
+  creating,
+  idle,
+  running,
+  close,
+}
+
 class _IsolateExecutor {
-  final Future<SendPort> sendPort;
-  final ReceivePort receivePort;
+  final ReceivePort _receivePort;
+  final String? debugLabel;
   void Function()? whenClose;
-  bool isClosed = false;
-  Isolate? isolate;
+  bool _isClosed = false;
+  Isolate? _isolate;
+  SendPort? _sendPort;
 
-  ITask? task;
+  ITask? _task;
 
-  _IsolateExecutor(this.sendPort, this.receivePort);
+  _IsolateExecutor(this._receivePort, ITask? _task, this.debugLabel);
 
-  bool get isIdle => task == null;
+  bool get isIdle =>
+      _isolate != null && _sendPort != null && !_isClosed && _task == null;
+
+  bool get isClosed => _isClosed;
+
+  bool get isCreating => !isClosed && _sendPort == null;
+
+  set sendPort(SendPort port) {
+    assert(!isClosed);
+    _sendPort = port;
+  }
 
   void emit(ITask task) {
-    this.task = task;
-    sendPort.then((value) {
-      if (!isClosed && task._task != null) {
-        final t = task._task;
-        try {
-          value.send(t);
-          task._task = null;
-        } catch (err, st) {
-          task._submitError(err, st);
-          close();
-        }
-      }
-    });
+    if (_task == task) return;
+    this._task = task;
+    assert(!isIdle, 'IsolateExecutor is busy');
+    try {
+      _sendPort!.send(task._task);
+      task._task = null;
+    } catch (err, st) {
+      task._submitError(err, st);
+      close();
+    }
   }
 
   void submit(_TaskResult result) {
-    if (result.taskId == task?.taskId) {
-      task?._submit(result);
+    if (result.taskId == _task?.taskId) {
+      _task?._submit(result);
     }
-    task = null;
+    _task = null;
   }
 
   ITask? close() {
-    isClosed = true;
-    final t = task;
+    _isClosed = true;
+    _sendPort = null;
+    final t = _task;
     whenClose?.call();
-    task = null;
-    receivePort.close();
-    isolate?.kill();
+    _task = null;
+    _receivePort.close();
+    _isolate?.kill();
     whenClose = null;
     return t?._task == null ? null : t;
   }

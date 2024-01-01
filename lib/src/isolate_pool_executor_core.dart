@@ -75,9 +75,9 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
   }
 
   void _addTask(ITask task, {bool header = false}) {
-    final executor = _findIdleExecutor();
+    final executor = _emitTask(task);
     if (executor != null) {
-      executor.emit(task);
+      // executor.emit(task);
       return;
     }
     try {
@@ -131,48 +131,67 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
       }
 
       while (taskQueue.isNotEmpty) {
-        final executor = _findIdleExecutor();
+        final task = taskQueue.first;
+        final executor = _emitTask(task);
         if (executor == null) {
           break;
         }
-        final task = taskQueue.removeFirst();
-        executor.emit(task);
+        final taskF = taskQueue.removeFirst();
+        assert(task == taskF, '??????');
       }
     });
   }
 
-  _IsolateExecutor? _findIdleExecutor() {
+  _IsolateExecutor? _emitTask(ITask task) {
     int i = 0, j = corePoolSize;
     for (; i < j; i++) {
       final e = _coreExecutor[i];
       if (e == null) {
-        _IsolateExecutor executor = _makeExecutor(true);
+        _IsolateExecutor executor = _makeExecutor(true, task);
         _coreExecutor[i] = executor;
         executor.whenClose = () => _coreExecutor[i] = null;
         return executor;
       } else if (e.isIdle) {
+        e.emit(task);
         return e;
       }
     }
     if (cachePoolSize == 0) return null;
     final idleExecutor = _cacheExecutor.firstWhereOrNull((e) => e.isIdle);
-    if (idleExecutor != null) return idleExecutor;
+    if (idleExecutor != null) {
+      idleExecutor.emit(task);
+      return idleExecutor;
+    }
     if (_cacheExecutor.length == cachePoolSize) {
       return null;
     }
-    _IsolateExecutor executor = keepAliveTime == Duration.zero
-        ? _makeNoCacheExecutor()
-        : _makeExecutor(false);
-    executor.whenClose = () => _cacheExecutor.remove(executor);
-    _cacheExecutor.add(executor);
-    return executor;
+    if (keepAliveTime == Duration.zero) {
+      return _makeNoCacheExecutor(task);
+    } else {
+      _IsolateExecutor executor = _makeExecutor(false, task);
+      executor.whenClose = () => _cacheExecutor.remove(executor);
+      _cacheExecutor.add(executor);
+      return executor;
+    }
+    // _IsolateExecutor executor = keepAliveTime == Duration.zero
+    //     ? _makeNoCacheExecutor(task)
+    //     : _makeExecutor(false, task);
+    // executor.whenClose = () => _cacheExecutor.remove(executor);
+    // _cacheExecutor.add(executor);
+    // return executor;
   }
 
-  _IsolateExecutor _makeExecutor(bool isCore) {
-    final completer = Completer<SendPort>();
+  _IsolateExecutor _makeExecutor(bool isCore, ITask task) {
+    // final completer = Completer<SendPort>();
     final receivePort = ReceivePort();
+    String? debugLabel;
+    assert(() {
+      debugLabel =
+          'IsolatePoolExecutor-${isCore ? 'Core' : 'NoCore'}-${_isolateIndex++}-worker';
+      return true;
+    }());
 
-    _IsolateExecutor executor = _IsolateExecutor(completer.future, receivePort);
+    _IsolateExecutor executor = _IsolateExecutor(receivePort, task, debugLabel);
 
     receivePort.listen((message) {
       if (message == null) {
@@ -185,7 +204,7 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
         }
         return;
       } else if (message is SendPort) {
-        if (!completer.isCompleted) completer.complete(message);
+        executor.sendPort = message;
         return;
       } else if (message is _TaskResult) {
         executor.submit(message);
@@ -216,22 +235,22 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
       }
     });
 
-    final args = List<dynamic>.filled(3, null);
+    final args = List<dynamic>.filled(4, null);
     args[0] = receivePort.sendPort;
     if (!isCore) args[1] = keepAliveTime;
     args[2] = isolateValues;
+    args[3] = task._task;
 
     Isolate.spawn(_worker, args,
             onError: receivePort.sendPort,
             onExit: receivePort.sendPort,
-            debugName:
-                'IsolatePoolExecutor-${isCore ? 'Core' : 'NoCore'}-${_isolateIndex++}-worker')
+            debugName: debugLabel)
         .then(
-      (value) => executor.isolate = value,
+      (value) => executor._isolate = value,
       onError: (error, stackTrace) {
         final task = executor.close();
         if (task != null) {
-          _addTask(task, header: true);
+          task._submitError(error, stackTrace);
         }
       },
     );
@@ -245,29 +264,40 @@ void _worker(List args) {
   _runIsolateWorkGuarded(sendPort, () {
     Duration? duration = args[1];
     final isolateValues = args[2];
+
     if (isolateValues != null) {
       _isolateValues.addAll(isolateValues as Map<Object, Object?>);
     }
+    final _Task? task = args[3];
 
     ReceivePort receivePort = ReceivePort();
     sendPort.send(receivePort.sendPort);
 
+    void Function() startListen;
     if (duration == null) {
-      receivePort
+      startListen = () => receivePort
           .listen((message) async => sendPort.send(await _invokeTask(message)));
     } else {
-      Timer? exitTimer;
-      final exitDuration = duration;
-      receivePort.listen((message) async {
-        exitTimer?.cancel();
-        exitTimer = null;
-        try {
-          final result = await _invokeTask(message);
-          sendPort.send(result);
-        } finally {
-          exitTimer = Timer(exitDuration, () => Isolate.exit());
-        }
-      });
+      startListen = () {
+        final exitDuration = duration;
+        Timer exitTimer = Timer(exitDuration, () => Isolate.exit());
+        receivePort.listen((message) async {
+          exitTimer.cancel();
+          try {
+            final result = await _invokeTask(message);
+            sendPort.send(result);
+          } finally {
+            exitTimer.cancel();
+            exitTimer = Timer(exitDuration, () => Isolate.exit());
+          }
+        });
+      };
+    }
+
+    if (task != null) {
+      _invokeTask(task).then(sendPort.send).then((_) => startListen());
+    } else {
+      startListen();
     }
   });
 }
