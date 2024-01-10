@@ -34,26 +34,30 @@ abstract class IsolatePoolExecutor {
           required Duration keepAliveTime,
           required Queue<ITask> taskQueue,
           required RejectedExecutionHandler handler,
-          Map<Object, Object?>? isolateValues}) =>
+          Map<Object, Object?>? isolateValues,
+          bool launchCoreImmediately = false}) =>
       _IsolatePoolExecutorCore(
           corePoolSize: corePoolSize,
           maximumPoolSize: maximumPoolSize,
           keepAliveTime: keepAliveTime,
           taskQueue: taskQueue,
           handler: handler,
-          isolateValues: isolateValues);
+          isolateValues: isolateValues,
+          launchCoreImmediately: launchCoreImmediately);
 
   factory IsolatePoolExecutor.newFixedIsolatePool(int nIsolates,
           {Queue<ITask>? taskQueue,
           RejectedExecutionHandler? handler,
-          Map<Object, Object?>? isolateValues}) =>
+          Map<Object, Object?>? isolateValues,
+          bool launchCoreImmediately = false}) =>
       _IsolatePoolExecutorCore(
           corePoolSize: nIsolates,
           maximumPoolSize: nIsolates,
           keepAliveTime: const Duration(seconds: 1),
           taskQueue: taskQueue ?? Queue(),
           handler: handler ?? RejectedExecutionHandler.abortPolicy,
-          isolateValues: isolateValues);
+          isolateValues: isolateValues,
+          launchCoreImmediately: launchCoreImmediately);
 
   ///
   /// taskQueueInIsolate 为true时 taskQueueFactory 会跨isolate访问无法使用当前isolate中的数据
@@ -61,14 +65,18 @@ abstract class IsolatePoolExecutor {
           {bool taskQueueInIsolate = false,
           Queue<ITask> Function()? taskQueueFactory,
           RejectedExecutionHandler? handler,
-          Map<Object, Object?>? isolateValues}) =>
+          Map<Object, Object?>? isolateValues,
+          bool launchCoreImmediately = false}) =>
       taskQueueInIsolate
           ? _IsolatePoolSingleExecutor(
-              taskQueueFactory: taskQueueFactory, isolateValues: isolateValues)
+              taskQueueFactory: taskQueueFactory,
+              isolateValues: isolateValues,
+              launchCoreImmediately: launchCoreImmediately)
           : IsolatePoolExecutor.newFixedIsolatePool(1,
               taskQueue: taskQueueFactory?.call(),
               handler: handler,
-              isolateValues: isolateValues);
+              isolateValues: isolateValues,
+              launchCoreImmediately: launchCoreImmediately);
 
   ///
   factory IsolatePoolExecutor.newCachedIsolatePool(

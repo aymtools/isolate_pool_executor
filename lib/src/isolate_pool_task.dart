@@ -95,6 +95,7 @@ class _IsolateExecutor {
   ITask? _task;
 
   late Timer timer;
+  void Function()? onTimeout;
 
   _IsolateExecutor(this._receivePort, ITask? _task, this.debugLabel);
 
@@ -120,6 +121,7 @@ class _IsolateExecutor {
         close()?._submitError(
             "Create Isolate timeout \n https://github.com/flutter/flutter/issues/132731",
             StackTrace.empty);
+        onTimeout?.call();
       }
     });
   }

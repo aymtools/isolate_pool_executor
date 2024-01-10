@@ -18,8 +18,14 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
       taskQueueFactory == null ? _emitTask2 : _emitTask1;
 
   _IsolatePoolSingleExecutor(
-      {Queue<ITask> Function()? taskQueueFactory, this.isolateValues})
-      : taskQueueFactory = taskQueueFactory;
+      {Queue<ITask> Function()? taskQueueFactory,
+      this.isolateValues,
+      bool launchCoreImmediately = false})
+      : taskQueueFactory = taskQueueFactory {
+    if (launchCoreImmediately) {
+      _coreExecutor[0] = _makeExecutor(null);
+    }
+  }
 
   @override
   Future<R> compute<Q, R>(FutureOr<R> Function(Q message) callback, Q message,
@@ -100,7 +106,7 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
     } else {}
   }
 
-  _IsolateExecutor _makeExecutor(ITask fistTask) {
+  _IsolateExecutor _makeExecutor(ITask? fistTask) {
     final receivePort = ReceivePort();
     String? debugLabel;
 
@@ -111,6 +117,18 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
 
     _IsolateExecutor executor =
         _IsolateExecutor(receivePort, fistTask, debugLabel);
+
+    //需要特殊处理
+    executor.onTimeout = () {
+      var error =
+          "Create Isolate timeout \n https://github.com/flutter/flutter/issues/132731";
+      taskQueue.values.forEach((task) {
+        task._submitError(error, StackTrace.empty);
+      });
+      executor.close();
+      taskQueue.clear();
+      creatingCache.clear();
+    };
 
     receivePort.listen((message) {
       if (message == null) {
@@ -173,18 +191,23 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
     args[0] = receivePort.sendPort;
     args[1] = taskQueueFactory;
     args[2] = isolateValues;
-    args[3] = fistTask._task;
+    args[3] = fistTask?._task;
 
     Isolate.spawn(_workerSingle, args,
             onError: receivePort.sendPort,
             onExit: receivePort.sendPort,
             debugName: debugLabel)
-        .then((value) => executor.isolate = value)
-        .catchError(
+        .then((value) {
+      executor.isolate = value;
+    }).catchError(
       (error, stackTrace) {
         executor.close();
-        fistTask._submitError(error, stackTrace);
-        taskQueue.remove(fistTask.taskId);
+        taskQueue.values.forEach((task) {
+          task._submitError(error, stackTrace);
+        });
+        executor.close();
+        taskQueue.clear();
+        creatingCache.clear();
       },
     );
 

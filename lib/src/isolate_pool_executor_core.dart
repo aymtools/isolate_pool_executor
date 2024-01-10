@@ -31,12 +31,18 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
       required this.keepAliveTime,
       required this.taskQueue,
       required this.handler,
-      this.isolateValues})
+      this.isolateValues,
+      bool launchCoreImmediately = false})
       : _coreExecutor = List.filled(corePoolSize, null),
         cachePoolSize = maximumPoolSize - corePoolSize,
         _cacheExecutor = [],
         assert(maximumPoolSize >= corePoolSize,
-            'must maximumPoolSize >= corePoolSize');
+            'must maximumPoolSize >= corePoolSize') {
+    if (launchCoreImmediately) {
+      for (int i = 0; i < corePoolSize; i++)
+        _coreExecutor[i] = _makeExecutor(true, null);
+    }
+  }
 
   Future<R> compute<Q, R>(FutureOr<R> Function(Q message) callback, Q message,
       {String? debugLabel, int what = 0, dynamic tag}) async {
@@ -181,7 +187,7 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
     // return executor;
   }
 
-  _IsolateExecutor _makeExecutor(bool isCore, ITask task) {
+  _IsolateExecutor _makeExecutor(bool isCore, ITask? task) {
     // final completer = Completer<SendPort>();
     final receivePort = ReceivePort();
     String? debugLabel;
@@ -239,7 +245,7 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
     args[0] = receivePort.sendPort;
     if (!isCore) args[1] = keepAliveTime;
     args[2] = isolateValues;
-    args[3] = task._task;
+    args[3] = task?._task;
 
     Isolate.spawn(_worker, args,
             onError: receivePort.sendPort,
