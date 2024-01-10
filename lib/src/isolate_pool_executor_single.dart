@@ -179,7 +179,7 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
             onError: receivePort.sendPort,
             onExit: receivePort.sendPort,
             debugName: debugLabel)
-        .then((value) => executor._isolate = value)
+        .then((value) => executor.isolate = value)
         .catchError(
       (error, stackTrace) {
         executor.close();

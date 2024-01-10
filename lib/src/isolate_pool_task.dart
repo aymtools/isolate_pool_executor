@@ -94,6 +94,8 @@ class _IsolateExecutor {
 
   ITask? _task;
 
+  late Timer timer;
+
   _IsolateExecutor(this._receivePort, ITask? _task, this.debugLabel);
 
   bool get isIdle =>
@@ -104,8 +106,22 @@ class _IsolateExecutor {
   bool get isCreating => !isClosed && _sendPort == null;
 
   set sendPort(SendPort port) {
+    timer.cancel();
     assert(!isClosed);
     _sendPort = port;
+  }
+
+  set isolate(Isolate isolate) {
+    assert(!isClosed);
+    _isolate = isolate;
+    //用以监听此bug https://github.com/flutter/flutter/issues/132731
+    timer = Timer(Duration(seconds: 1), () {
+      if (!isClosed && _sendPort == null) {
+        close()?._submitError(
+            "Create Isolate timeout \n https://github.com/flutter/flutter/issues/132731",
+            StackTrace.empty);
+      }
+    });
   }
 
   void emit(ITask task) {

@@ -246,7 +246,7 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
             onExit: receivePort.sendPort,
             debugName: debugLabel)
         .then(
-      (value) => executor._isolate = value,
+      (value) => executor.isolate = value,
       onError: (error, stackTrace) {
         final task = executor.close();
         if (task != null) {

@@ -22,7 +22,7 @@ extension _IsolatePoolExecutorCoreNoCache on _IsolatePoolExecutorCore {
               onExit: receivePort.sendPort,
               debugName: debugLabel)
           .then(
-        (value) => executor._isolate = value,
+        (value) => executor.isolate = value,
         onError: (error, stackTrace) {
           final task = executor.close();
           if (task != null) {
@@ -42,7 +42,7 @@ extension _IsolatePoolExecutorCoreNoCache on _IsolatePoolExecutorCore {
         runIsolate(message);
         return;
       } else if (message is _TaskResult) {
-        executor._task?._submit(message);
+        executor.submit(message);
       } else if (message is List && message.length == 2) {
         //发生了异常退出
         final task = executor.close();
@@ -60,6 +60,9 @@ extension _IsolatePoolExecutorCoreNoCache on _IsolatePoolExecutorCore {
             task._submitError(error, error.stackTrace);
           }
         }
+      } else if (message is SendPort) {
+        executor.sendPort = message;
+        return;
       }
       executor.close();
       _poolTask();
@@ -72,6 +75,9 @@ extension _IsolatePoolExecutorCoreNoCache on _IsolatePoolExecutorCore {
 void _workerNoCache(List args) {
   SendPort sendPort = args[0];
   _runIsolateWorkGuarded(sendPort, () {
+    ReceivePort receivePort = ReceivePort();
+    sendPort.send(receivePort.sendPort);
+
     _Task task = args[1];
     final isolateValues = args[2];
     if (isolateValues != null) {
