@@ -33,4 +33,5 @@
 
 * 优化首次启动isolate时直接携带任务，减少一次发送，同时调整isolated的空闲判断
 * 增加验证启动Isolate的超时判断，已知原因 https://github.com/flutter/flutter/issues/132731
+* 增加一个参数launchCoreImmediately默认为false 立即启动所有的core Isolate
 
