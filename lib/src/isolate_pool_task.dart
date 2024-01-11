@@ -97,7 +97,7 @@ class _IsolateExecutor {
   late Timer timer;
   void Function()? onTimeout;
 
-  _IsolateExecutor(this._receivePort, ITask? _task, this.debugLabel);
+  _IsolateExecutor(this._receivePort, this._task, this.debugLabel);
 
   bool get isIdle =>
       _isolate != null && _sendPort != null && !_isClosed && _task == null;
