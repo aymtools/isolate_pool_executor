@@ -35,3 +35,7 @@
 * 增加验证启动Isolate的超时判断，已知原因 https://github.com/flutter/flutter/issues/132731
 * 增加一个参数launchCoreImmediately默认为false 立即启动所有的core Isolate
 
+## 1.1.1
+
+* 增加创建一个参数onIsolateCreated当Isolate创建后会立即调用，配合isolateValues可以实现初始化当前个Isolate的一些数据。
+* 例如： https://medium.com/flutter/introducing-background-isolate-channels-7a299609cad8 此需求

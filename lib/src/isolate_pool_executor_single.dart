@@ -10,6 +10,8 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
 
   final Map<int, ITask> taskQueue = {};
 
+  final void Function(Map<Object, Object?>? isolateValues)? onIsolateCreated;
+
   bool _shutdown = false;
 
   List<ITask> creatingCache = [];
@@ -20,7 +22,8 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
   _IsolatePoolSingleExecutor(
       {Queue<ITask> Function()? taskQueueFactory,
       this.isolateValues,
-      bool launchCoreImmediately = false})
+      bool launchCoreImmediately = false,
+      this.onIsolateCreated})
       : taskQueueFactory = taskQueueFactory {
     if (launchCoreImmediately) {
       _coreExecutor[0] = _makeExecutor(null);
@@ -187,11 +190,12 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
         creatingCache.clear();
       }
     });
-    final args = List<dynamic>.filled(4, null);
+    final args = List<dynamic>.filled(5, null);
     args[0] = receivePort.sendPort;
     args[1] = taskQueueFactory;
     args[2] = isolateValues;
     args[3] = fistTask?._task;
+    args[4] = onIsolateCreated;
 
     Isolate.spawn(_workerSingle, args,
             onError: receivePort.sendPort,
@@ -227,6 +231,12 @@ void _workerSingle(List args) {
 
     ReceivePort receivePort = ReceivePort();
     sendPort.send(receivePort.sendPort);
+
+    try {
+      void Function(Map<Object, Object?>? isolateValues)? onIsolateCreated =
+      args[4];
+      onIsolateCreated?.call(Map.of(_isolateValues));
+    } catch (ignore) {}
 
     final _Task? task = args[3];
 

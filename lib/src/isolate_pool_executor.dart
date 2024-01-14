@@ -35,7 +35,9 @@ abstract class IsolatePoolExecutor {
           required Queue<ITask> taskQueue,
           required RejectedExecutionHandler handler,
           Map<Object, Object?>? isolateValues,
-          bool launchCoreImmediately = false}) =>
+          bool launchCoreImmediately = false,
+          void Function(Map<Object, Object?>? isolateValues)?
+              onIsolateCreated}) =>
       _IsolatePoolExecutorCore(
           corePoolSize: corePoolSize,
           maximumPoolSize: maximumPoolSize,
@@ -43,13 +45,16 @@ abstract class IsolatePoolExecutor {
           taskQueue: taskQueue,
           handler: handler,
           isolateValues: isolateValues,
-          launchCoreImmediately: launchCoreImmediately);
+          launchCoreImmediately: launchCoreImmediately,
+          onIsolateCreated: onIsolateCreated);
 
   factory IsolatePoolExecutor.newFixedIsolatePool(int nIsolates,
           {Queue<ITask>? taskQueue,
           RejectedExecutionHandler? handler,
           Map<Object, Object?>? isolateValues,
-          bool launchCoreImmediately = false}) =>
+          bool launchCoreImmediately = false,
+          void Function(Map<Object, Object?>? isolateValues)?
+              onIsolateCreated}) =>
       _IsolatePoolExecutorCore(
           corePoolSize: nIsolates,
           maximumPoolSize: nIsolates,
@@ -57,7 +62,8 @@ abstract class IsolatePoolExecutor {
           taskQueue: taskQueue ?? Queue(),
           handler: handler ?? RejectedExecutionHandler.abortPolicy,
           isolateValues: isolateValues,
-          launchCoreImmediately: launchCoreImmediately);
+          launchCoreImmediately: launchCoreImmediately,
+          onIsolateCreated: onIsolateCreated);
 
   ///
   /// taskQueueInIsolate 为true时 taskQueueFactory 会跨isolate访问无法使用当前isolate中的数据
@@ -66,22 +72,28 @@ abstract class IsolatePoolExecutor {
           Queue<ITask> Function()? taskQueueFactory,
           RejectedExecutionHandler? handler,
           Map<Object, Object?>? isolateValues,
-          bool launchCoreImmediately = false}) =>
+          bool launchCoreImmediately = false,
+          void Function(Map<Object, Object?>? isolateValues)?
+              onIsolateCreated}) =>
       taskQueueInIsolate
           ? _IsolatePoolSingleExecutor(
               taskQueueFactory: taskQueueFactory,
               isolateValues: isolateValues,
-              launchCoreImmediately: launchCoreImmediately)
+              launchCoreImmediately: launchCoreImmediately,
+              onIsolateCreated: onIsolateCreated)
           : IsolatePoolExecutor.newFixedIsolatePool(1,
               taskQueue: taskQueueFactory?.call(),
               handler: handler,
               isolateValues: isolateValues,
-              launchCoreImmediately: launchCoreImmediately);
+              launchCoreImmediately: launchCoreImmediately,
+              onIsolateCreated: onIsolateCreated);
 
   ///
   factory IsolatePoolExecutor.newCachedIsolatePool(
           {Duration keepAliveTime = const Duration(seconds: 10),
-          Map<Object, Object?>? isolateValues}) =>
+          Map<Object, Object?>? isolateValues,
+          void Function(Map<Object, Object?>? isolateValues)?
+              onIsolateCreated}) =>
       _IsolatePoolExecutorCore(
           corePoolSize: 0,
           // java中int最大值 魔法数
@@ -89,7 +101,8 @@ abstract class IsolatePoolExecutor {
           keepAliveTime: keepAliveTime,
           taskQueue: QueueEmpty(),
           handler: RejectedExecutionHandler.abortPolicy,
-          isolateValues: isolateValues);
+          isolateValues: isolateValues,
+          onIsolateCreated: onIsolateCreated);
 
   Future<R> compute<Q, R>(FutureOr<R> Function(Q message) callback, Q message,
       {String? debugLabel, int what = 0, dynamic tag});

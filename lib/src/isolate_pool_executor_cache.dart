@@ -12,10 +12,11 @@ extension _IsolatePoolExecutorCoreNoCache on _IsolatePoolExecutorCore {
     _IsolateExecutor executor = _IsolateExecutor(receivePort, task, debugLabel);
 
     void runIsolate(_Task task) {
-      final args = List<dynamic>.filled(3, null);
+      final args = List<dynamic>.filled(4, null);
       args[0] = receivePort.sendPort;
       args[1] = task;
       args[2] = isolateValues;
+      args[3] = onIsolateCreated;
 
       Isolate.spawn(_workerNoCache, args,
               onError: receivePort.sendPort,
@@ -75,14 +76,22 @@ extension _IsolatePoolExecutorCoreNoCache on _IsolatePoolExecutorCore {
 void _workerNoCache(List args) {
   SendPort sendPort = args[0];
   _runIsolateWorkGuarded(sendPort, () {
-    ReceivePort receivePort = ReceivePort();
-    sendPort.send(receivePort.sendPort);
-
-    _Task task = args[1];
     final isolateValues = args[2];
     if (isolateValues != null) {
       _isolateValues.addAll(isolateValues as Map<Object, Object?>);
     }
+
+    ReceivePort receivePort = ReceivePort();
+    sendPort.send(receivePort.sendPort);
+
+    try {
+      void Function(Map<Object, Object?>? isolateValues)? onIsolateCreated =
+          args[3];
+      onIsolateCreated?.call(Map.of(_isolateValues));
+    } catch (ignore) {}
+
+    _Task task = args[1];
+
     _invokeTask(task).then((result) => Isolate.exit(sendPort, result));
   });
 }
