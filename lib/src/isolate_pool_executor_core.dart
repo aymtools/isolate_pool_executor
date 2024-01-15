@@ -215,6 +215,9 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
         return;
       } else if (message is SendPort) {
         executor.sendPort = message;
+        if (isCore && executor.isIdle) {
+          _poolTask(executor);
+        }
         return;
       } else if (message is _TaskResult) {
         executor.submit(message);
