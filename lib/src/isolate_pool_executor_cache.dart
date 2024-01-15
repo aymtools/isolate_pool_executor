@@ -2,7 +2,7 @@ part of 'isolate_pool_executor.dart';
 
 extension _IsolatePoolExecutorCoreNoCache on _IsolatePoolExecutorCore {
   _IsolateExecutor _makeNoCacheExecutor(ITask task) {
-    final receivePort = ReceivePort();
+    final receivePort = RawReceivePort();
     String? debugLabel;
     assert(() {
       debugLabel = 'IsolatePoolExecutor-NoCache-${_isolateIndex++}-worker';
@@ -33,7 +33,7 @@ extension _IsolatePoolExecutorCoreNoCache on _IsolatePoolExecutorCore {
       );
     }
 
-    receivePort.listen((message) {
+    receivePort.handler = ((message) {
       if (message == null) {
         // onExit handler message, isolate terminated without sending result.
         executor._task?._submitError(

@@ -110,7 +110,8 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
   }
 
   _IsolateExecutor _makeExecutor(ITask? fistTask) {
-    final receivePort = ReceivePort();
+    final receivePort = RawReceivePort();
+
     String? debugLabel;
 
     assert(() {
@@ -133,7 +134,7 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
       creatingCache.clear();
     };
 
-    receivePort.listen((message) {
+    receivePort.handler = ((message) {
       if (message == null) {
         //执行了Isolate exit
         final err = RemoteError("Computation ended without result", "");
@@ -234,7 +235,7 @@ void _workerSingle(List args) {
 
     try {
       void Function(Map<Object, Object?>? isolateValues)? onIsolateCreated =
-      args[4];
+          args[4];
       onIsolateCreated?.call(Map.of(_isolateValues));
     } catch (ignore) {}
 

@@ -85,7 +85,7 @@ enum IsolateExecutorState {
 }
 
 class _IsolateExecutor {
-  final ReceivePort _receivePort;
+  final RawReceivePort _receivePort;
   final String? debugLabel;
   void Function()? whenClose;
   bool _isClosed = false;

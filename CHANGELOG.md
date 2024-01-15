@@ -2,6 +2,7 @@
 
 * 增加创建一个参数onIsolateCreated当Isolate创建后会立即调用，配合isolateValues可以实现初始化当前个Isolate的一些数据。
 * 例如： https://medium.com/flutter/introducing-background-isolate-channels-7a299609cad8 此需求
+* Isolate直接的交互使用RawReceivePort
 
 ## 1.1.0
 

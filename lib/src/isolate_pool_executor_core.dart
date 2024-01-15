@@ -193,7 +193,7 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
 
   _IsolateExecutor _makeExecutor(bool isCore, ITask? task) {
     // final completer = Completer<SendPort>();
-    final receivePort = ReceivePort();
+    final receivePort = RawReceivePort();
     String? debugLabel;
     assert(() {
       debugLabel =
@@ -203,7 +203,7 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
 
     _IsolateExecutor executor = _IsolateExecutor(receivePort, task, debugLabel);
 
-    receivePort.listen((message) {
+    receivePort.handler = ((message) {
       if (message == null) {
         //执行了Isolate exit
         final task = executor.close();
