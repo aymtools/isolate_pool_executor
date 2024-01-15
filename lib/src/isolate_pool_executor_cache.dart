@@ -75,7 +75,7 @@ extension _IsolatePoolExecutorCoreNoCache on _IsolatePoolExecutorCore {
 
 void _workerNoCache(List args) {
   SendPort sendPort = args[0];
-  _runIsolateWorkGuarded(sendPort, () {
+  _runIsolateWorkGuarded(sendPort, () async {
     final isolateValues = args[2];
     if (isolateValues != null) {
       _isolateValues.addAll(isolateValues as Map<Object, Object?>);
@@ -85,9 +85,14 @@ void _workerNoCache(List args) {
     sendPort.send(receivePort.sendPort);
 
     try {
-      void Function(Map<Object, Object?>? isolateValues)? onIsolateCreated =
-          args[3];
-      onIsolateCreated?.call(Map.of(_isolateValues));
+      FutureOr<void> Function(Map<Object, Object?>? isolateValues)?
+          onIsolateCreated = args[3];
+      if (onIsolateCreated != null) {
+        final result = onIsolateCreated.call(_isolateValues);
+        if (result is Future) {
+          await result;
+        }
+      }
     } catch (ignore) {}
 
     _Task task = args[1];

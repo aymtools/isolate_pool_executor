@@ -20,8 +20,8 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
 
   final List<_IsolateExecutor?> _coreExecutor;
   final List<_IsolateExecutor> _cacheExecutor;
-  final void Function(Map<Object, Object?>? isolateValues)? onIsolateCreated;
-  final void Function(Map<Object, Object?>? isolateValues)? onIsolateDestroy;
+  final FutureOr<void> Function(Map<Object, Object?>? isolateValues)?
+      onIsolateCreated;
 
   bool _shutdown = false;
 
@@ -35,8 +35,7 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
       required this.handler,
       this.isolateValues,
       bool launchCoreImmediately = false,
-      this.onIsolateCreated,
-      this.onIsolateDestroy})
+      this.onIsolateCreated})
       : _coreExecutor = List.filled(corePoolSize, null),
         cachePoolSize = maximumPoolSize - corePoolSize,
         _cacheExecutor = [],
@@ -275,23 +274,29 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
 
 void _worker(List args) {
   SendPort sendPort = args[0];
-  _runIsolateWorkGuarded(sendPort, () {
+  _runIsolateWorkGuarded(sendPort, () async {
     Duration? duration = args[1];
     final isolateValues = args[2];
 
     if (isolateValues != null) {
       _isolateValues.addAll(isolateValues as Map<Object, Object?>);
     }
-    final _Task? task = args[3];
 
     ReceivePort receivePort = ReceivePort();
     sendPort.send(receivePort.sendPort);
 
     try {
-      void Function(Map<Object, Object?>? isolateValues)? onIsolateCreated =
-          args[4];
-      onIsolateCreated?.call(Map.of(_isolateValues));
+      FutureOr<void> Function(Map<Object, Object?>? isolateValues)?
+          onIsolateCreated = args[4];
+      if (onIsolateCreated != null) {
+        final result = onIsolateCreated.call(_isolateValues);
+        if (result is Future) {
+          await result;
+        }
+      }
     } catch (ignore) {}
+
+    final _Task? task = args[3];
 
     void Function() startListen;
     if (duration == null) {

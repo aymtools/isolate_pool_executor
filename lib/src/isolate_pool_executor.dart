@@ -36,7 +36,7 @@ abstract class IsolatePoolExecutor {
           required RejectedExecutionHandler handler,
           Map<Object, Object?>? isolateValues,
           bool launchCoreImmediately = false,
-          void Function(Map<Object, Object?>? isolateValues)?
+          FutureOr<void> Function(Map<Object, Object?>? isolateValues)?
               onIsolateCreated}) =>
       _IsolatePoolExecutorCore(
           corePoolSize: corePoolSize,
@@ -53,7 +53,7 @@ abstract class IsolatePoolExecutor {
           RejectedExecutionHandler? handler,
           Map<Object, Object?>? isolateValues,
           bool launchCoreImmediately = false,
-          void Function(Map<Object, Object?>? isolateValues)?
+          FutureOr<void> Function(Map<Object, Object?>? isolateValues)?
               onIsolateCreated}) =>
       _IsolatePoolExecutorCore(
           corePoolSize: nIsolates,
@@ -73,7 +73,7 @@ abstract class IsolatePoolExecutor {
           RejectedExecutionHandler? handler,
           Map<Object, Object?>? isolateValues,
           bool launchCoreImmediately = false,
-          void Function(Map<Object, Object?>? isolateValues)?
+          FutureOr<void> Function(Map<Object, Object?>? isolateValues)?
               onIsolateCreated}) =>
       taskQueueInIsolate
           ? _IsolatePoolSingleExecutor(
@@ -92,7 +92,7 @@ abstract class IsolatePoolExecutor {
   factory IsolatePoolExecutor.newCachedIsolatePool(
           {Duration keepAliveTime = const Duration(seconds: 10),
           Map<Object, Object?>? isolateValues,
-          void Function(Map<Object, Object?>? isolateValues)?
+          FutureOr<void> Function(Map<Object, Object?>? isolateValues)?
               onIsolateCreated}) =>
       _IsolatePoolExecutorCore(
           corePoolSize: 0,

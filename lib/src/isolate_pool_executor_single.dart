@@ -10,7 +10,7 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
 
   final Map<int, ITask> taskQueue = {};
 
-  final void Function(Map<Object, Object?>? isolateValues)? onIsolateCreated;
+  final FutureOr<void> Function(Map<Object, Object?>? isolateValues)? onIsolateCreated;
 
   bool _shutdown = false;
 
@@ -222,7 +222,7 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
 
 void _workerSingle(List args) {
   SendPort sendPort = args[0];
-  _runIsolateWorkGuarded(sendPort, () {
+  _runIsolateWorkGuarded(sendPort, () async {
     Queue<ITask> Function()? taskQueueFactory = args[1];
 
     final isolateValues = args[2];
@@ -234,9 +234,14 @@ void _workerSingle(List args) {
     sendPort.send(receivePort.sendPort);
 
     try {
-      void Function(Map<Object, Object?>? isolateValues)? onIsolateCreated =
-          args[4];
-      onIsolateCreated?.call(Map.of(_isolateValues));
+      FutureOr<void> Function(Map<Object, Object?>? isolateValues)?
+      onIsolateCreated = args[4];
+      if (onIsolateCreated != null) {
+        final result = onIsolateCreated.call(_isolateValues);
+        if (result is Future) {
+          await result;
+        }
+      }
     } catch (ignore) {}
 
     final _Task? task = args[3];
