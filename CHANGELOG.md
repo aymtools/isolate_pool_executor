@@ -1,3 +1,7 @@
+## 1.1.2
+
+* 新增可以指定IsolatePoolExecutor的debugLabel
+
 ## 1.1.1
 
 * 增加创建一个参数onIsolateCreated当Isolate创建后会立即调用，配合isolateValues可以实现初始化当前个Isolate的一些数据。

@@ -23,6 +23,8 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
   final FutureOr<void> Function(Map<Object, Object?>? isolateValues)?
       onIsolateCreated;
 
+  final String? debugLabel;
+
   bool _shutdown = false;
 
   int _isolateIndex = 0;
@@ -35,7 +37,8 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
       required this.handler,
       this.isolateValues,
       bool launchCoreImmediately = false,
-      this.onIsolateCreated})
+      this.onIsolateCreated,
+      this.debugLabel})
       : _coreExecutor = List.filled(corePoolSize, null),
         cachePoolSize = maximumPoolSize - corePoolSize,
         _cacheExecutor = [],
@@ -74,7 +77,8 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
 
   ITask<R> _makeTask<R>(dynamic Function(dynamic p) run, dynamic p,
       String debugLabel, int what, dynamic tag) {
-    if (_shutdown) throw 'IsolatePoolExecutor is shutdown';
+    if (_shutdown)
+      throw 'IsolatePoolExecutor${this.debugLabel?.isNotEmpty == true ? '-${this.debugLabel}' : ''} is shutdown';
 
     ITask<R> task = ITask<R>._task(run, p, debugLabel, what, tag);
 
@@ -196,7 +200,8 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
     String? debugLabel;
     assert(() {
       debugLabel =
-          'IsolatePoolExecutor-${isCore ? 'Core' : 'NoCore'}-${_isolateIndex++}-worker';
+          'IsolatePoolExecutor${this.debugLabel?.isNotEmpty == true ? '-${this.debugLabel}' : ''}'
+          '-${isCore ? 'Core' : 'NotCore'}-${_isolateIndex++}-worker';
       return true;
     }());
 

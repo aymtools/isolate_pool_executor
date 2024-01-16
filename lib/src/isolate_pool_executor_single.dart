@@ -10,7 +10,9 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
 
   final Map<int, ITask> taskQueue = {};
 
-  final FutureOr<void> Function(Map<Object, Object?>? isolateValues)? onIsolateCreated;
+  final FutureOr<void> Function(Map<Object, Object?>? isolateValues)?
+      onIsolateCreated;
+  final String? debugLabel;
 
   bool _shutdown = false;
 
@@ -23,7 +25,8 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
       {Queue<ITask> Function()? taskQueueFactory,
       this.isolateValues,
       bool launchCoreImmediately = false,
-      this.onIsolateCreated})
+      this.onIsolateCreated,
+      this.debugLabel})
       : taskQueueFactory = taskQueueFactory {
     if (launchCoreImmediately) {
       _coreExecutor[0] = _makeExecutor(null);
@@ -52,7 +55,8 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
 
   ITask<R> _makeTask<R>(dynamic Function(dynamic p) run, dynamic p,
       String debugLabel, int what, dynamic tag) {
-    if (_shutdown) throw 'SingleIsolatePoolExecutor is shutdown';
+    if (_shutdown)
+      throw 'SingleIsolatePoolExecutor${this.debugLabel?.isNotEmpty == true ? '-${this.debugLabel}' : ''} is shutdown';
 
     ITask<R> task = ITask<R>._task(run, p, debugLabel, what, tag);
     taskQueue[task.taskId] = task;
@@ -115,7 +119,8 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
     String? debugLabel;
 
     assert(() {
-      debugLabel = 'SingleIsolatePoolExecutor-worker';
+      debugLabel =
+          'SingleIsolatePoolExecutor${this.debugLabel?.isNotEmpty == true ? '-${this.debugLabel}' : ''}-worker';
       return true;
     }());
 
@@ -235,7 +240,7 @@ void _workerSingle(List args) {
 
     try {
       FutureOr<void> Function(Map<Object, Object?>? isolateValues)?
-      onIsolateCreated = args[4];
+          onIsolateCreated = args[4];
       if (onIsolateCreated != null) {
         final result = onIsolateCreated.call(_isolateValues);
         if (result is Future) {

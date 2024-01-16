@@ -5,7 +5,9 @@ extension _IsolatePoolExecutorCoreNoCache on _IsolatePoolExecutorCore {
     final receivePort = RawReceivePort();
     String? debugLabel;
     assert(() {
-      debugLabel = 'IsolatePoolExecutor-NoCache-${_isolateIndex++}-worker';
+      debugLabel =
+          'IsolatePoolExecutor${this.debugLabel?.isNotEmpty == true ? '-${this.debugLabel}' : ''}'
+          '-NotCache-${_isolateIndex++}-worker';
       return true;
     }());
 

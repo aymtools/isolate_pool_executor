@@ -28,81 +28,101 @@ enum RejectedExecutionHandler {
 }
 
 abstract class IsolatePoolExecutor {
-  factory IsolatePoolExecutor(
-          {required int corePoolSize,
-          required int maximumPoolSize,
-          required Duration keepAliveTime,
-          required Queue<ITask> taskQueue,
-          required RejectedExecutionHandler handler,
-          Map<Object, Object?>? isolateValues,
-          bool launchCoreImmediately = false,
-          FutureOr<void> Function(Map<Object, Object?>? isolateValues)?
-              onIsolateCreated}) =>
+  factory IsolatePoolExecutor({
+    required int corePoolSize,
+    required int maximumPoolSize,
+    required Duration keepAliveTime,
+    required Queue<ITask> taskQueue,
+    required RejectedExecutionHandler handler,
+    Map<Object, Object?>? isolateValues,
+    bool launchCoreImmediately = false,
+    FutureOr<void> Function(Map<Object, Object?>? isolateValues)?
+        onIsolateCreated,
+    String? debugLabel,
+  }) =>
       _IsolatePoolExecutorCore(
-          corePoolSize: corePoolSize,
-          maximumPoolSize: maximumPoolSize,
-          keepAliveTime: keepAliveTime,
-          taskQueue: taskQueue,
-          handler: handler,
-          isolateValues: isolateValues,
-          launchCoreImmediately: launchCoreImmediately,
-          onIsolateCreated: onIsolateCreated);
+        corePoolSize: corePoolSize,
+        maximumPoolSize: maximumPoolSize,
+        keepAliveTime: keepAliveTime,
+        taskQueue: taskQueue,
+        handler: handler,
+        isolateValues: isolateValues,
+        launchCoreImmediately: launchCoreImmediately,
+        onIsolateCreated: onIsolateCreated,
+        debugLabel: debugLabel,
+      );
 
-  factory IsolatePoolExecutor.newFixedIsolatePool(int nIsolates,
-          {Queue<ITask>? taskQueue,
-          RejectedExecutionHandler? handler,
-          Map<Object, Object?>? isolateValues,
-          bool launchCoreImmediately = false,
-          FutureOr<void> Function(Map<Object, Object?>? isolateValues)?
-              onIsolateCreated}) =>
+  factory IsolatePoolExecutor.newFixedIsolatePool(
+    int nIsolates, {
+    Queue<ITask>? taskQueue,
+    RejectedExecutionHandler? handler,
+    Map<Object, Object?>? isolateValues,
+    bool launchCoreImmediately = false,
+    FutureOr<void> Function(Map<Object, Object?>? isolateValues)?
+        onIsolateCreated,
+    String? debugLabel,
+  }) =>
       _IsolatePoolExecutorCore(
-          corePoolSize: nIsolates,
-          maximumPoolSize: nIsolates,
-          keepAliveTime: const Duration(seconds: 1),
-          taskQueue: taskQueue ?? Queue(),
-          handler: handler ?? RejectedExecutionHandler.abortPolicy,
-          isolateValues: isolateValues,
-          launchCoreImmediately: launchCoreImmediately,
-          onIsolateCreated: onIsolateCreated);
+        corePoolSize: nIsolates,
+        maximumPoolSize: nIsolates,
+        keepAliveTime: const Duration(seconds: 1),
+        taskQueue: taskQueue ?? Queue(),
+        handler: handler ?? RejectedExecutionHandler.abortPolicy,
+        isolateValues: isolateValues,
+        launchCoreImmediately: launchCoreImmediately,
+        onIsolateCreated: onIsolateCreated,
+        debugLabel: debugLabel,
+      );
 
   ///
   /// taskQueueInIsolate 为true时 taskQueueFactory 会跨isolate访问无法使用当前isolate中的数据
-  factory IsolatePoolExecutor.newSingleIsolateExecutor(
-          {bool taskQueueInIsolate = false,
-          Queue<ITask> Function()? taskQueueFactory,
-          RejectedExecutionHandler? handler,
-          Map<Object, Object?>? isolateValues,
-          bool launchCoreImmediately = false,
-          FutureOr<void> Function(Map<Object, Object?>? isolateValues)?
-              onIsolateCreated}) =>
+  factory IsolatePoolExecutor.newSingleIsolateExecutor({
+    bool taskQueueInIsolate = false,
+    Queue<ITask> Function()? taskQueueFactory,
+    RejectedExecutionHandler? handler,
+    Map<Object, Object?>? isolateValues,
+    bool launchCoreImmediately = false,
+    FutureOr<void> Function(Map<Object, Object?>? isolateValues)?
+        onIsolateCreated,
+    String? debugLabel,
+  }) =>
       taskQueueInIsolate
           ? _IsolatePoolSingleExecutor(
               taskQueueFactory: taskQueueFactory,
               isolateValues: isolateValues,
               launchCoreImmediately: launchCoreImmediately,
-              onIsolateCreated: onIsolateCreated)
-          : IsolatePoolExecutor.newFixedIsolatePool(1,
+              onIsolateCreated: onIsolateCreated,
+              debugLabel: debugLabel,
+            )
+          : IsolatePoolExecutor.newFixedIsolatePool(
+              1,
               taskQueue: taskQueueFactory?.call(),
               handler: handler,
               isolateValues: isolateValues,
               launchCoreImmediately: launchCoreImmediately,
-              onIsolateCreated: onIsolateCreated);
+              onIsolateCreated: onIsolateCreated,
+              debugLabel: debugLabel,
+            );
 
   ///
-  factory IsolatePoolExecutor.newCachedIsolatePool(
-          {Duration keepAliveTime = const Duration(seconds: 10),
-          Map<Object, Object?>? isolateValues,
-          FutureOr<void> Function(Map<Object, Object?>? isolateValues)?
-              onIsolateCreated}) =>
+  factory IsolatePoolExecutor.newCachedIsolatePool({
+    Duration keepAliveTime = const Duration(seconds: 10),
+    Map<Object, Object?>? isolateValues,
+    FutureOr<void> Function(Map<Object, Object?>? isolateValues)?
+        onIsolateCreated,
+    String? debugLabel,
+  }) =>
       _IsolatePoolExecutorCore(
-          corePoolSize: 0,
-          // java中int最大值 魔法数
-          maximumPoolSize: 2147483647,
-          keepAliveTime: keepAliveTime,
-          taskQueue: QueueEmpty(),
-          handler: RejectedExecutionHandler.abortPolicy,
-          isolateValues: isolateValues,
-          onIsolateCreated: onIsolateCreated);
+        corePoolSize: 0,
+        // java中int最大值 魔法数
+        maximumPoolSize: 2147483647,
+        keepAliveTime: keepAliveTime,
+        taskQueue: QueueEmpty(),
+        handler: RejectedExecutionHandler.abortPolicy,
+        isolateValues: isolateValues,
+        onIsolateCreated: onIsolateCreated,
+        debugLabel: debugLabel,
+      );
 
   Future<R> compute<Q, R>(FutureOr<R> Function(Q message) callback, Q message,
       {String? debugLabel, int what = 0, dynamic tag});
