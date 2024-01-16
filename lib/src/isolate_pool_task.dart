@@ -116,11 +116,14 @@ class _IsolateExecutor {
     assert(!isClosed);
     _isolate = isolate;
     //用以监听此bug https://github.com/flutter/flutter/issues/132731
-    timer = Timer(Duration(seconds: 1), () {
+    timer = Timer(Duration(seconds: 10), () {
       if (!isClosed && _sendPort == null) {
         close()?._submitError(
-            "Create Isolate timeout \n https://github.com/flutter/flutter/issues/132731",
+            "Create Isolate timeout (10 seconds)\n "
+            "Known cause:1.Open too many isolates at the same time \n2.https://github.com/flutter/flutter/issues/132731",
             StackTrace.empty);
+        print("Create Isolate timeout (10 seconds)\n "
+            "Known cause:1.Open too many isolates at the same time \n2.https://github.com/flutter/flutter/issues/132731");
         onTimeout?.call();
       }
     });
