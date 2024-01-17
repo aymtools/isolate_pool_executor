@@ -84,6 +84,8 @@ enum IsolateExecutorState {
   close,
 }
 
+int _creating = 3;
+
 class _IsolateExecutor {
   final RawReceivePort _receivePort;
   final String? debugLabel;
@@ -107,6 +109,7 @@ class _IsolateExecutor {
   bool get isCreating => !isClosed && _sendPort == null;
 
   set sendPort(SendPort port) {
+    if (_creating > 3) _creating--;
     timer.cancel();
     assert(!isClosed);
     _sendPort = port;
@@ -115,15 +118,18 @@ class _IsolateExecutor {
   set isolate(Isolate isolate) {
     assert(!isClosed);
     _isolate = isolate;
+    _creating++;
+    final time = _creating;
     //用以监听此bug https://github.com/flutter/flutter/issues/132731
-    timer = Timer(Duration(seconds: 10), () {
+    timer = Timer(Duration(seconds: _creating), () {
+      if (_creating > 3) _creating--;
       if (!isClosed && _sendPort == null) {
         close()?._submitError(
-            "Create Isolate timeout (10 seconds)\n "
-            "Known cause:1.Open too many isolates at the same time \n2.https://github.com/flutter/flutter/issues/132731",
+            "Create Isolate timeout ($time seconds)\n "
+            "Known cause:\n1.Open too many isolates at the same time \n2.https://github.com/flutter/flutter/issues/132731",
             StackTrace.empty);
-        print("Create Isolate timeout (10 seconds)\n "
-            "Known cause:1.Open too many isolates at the same time \n2.https://github.com/flutter/flutter/issues/132731");
+        print("Create Isolate timeout ($time seconds)\n "
+            "Known cause:\n1.Open too many isolates at the same time \n2.https://github.com/flutter/flutter/issues/132731");
         onTimeout?.call();
       }
     });

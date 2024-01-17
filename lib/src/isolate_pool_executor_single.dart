@@ -29,7 +29,9 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
       this.debugLabel})
       : taskQueueFactory = taskQueueFactory {
     if (launchCoreImmediately) {
-      _coreExecutor[0] = _makeExecutor(null);
+      final executor = _makeExecutor(null);
+      executor.whenClose = () => _coreExecutor[0] = null;
+      _coreExecutor[0] = executor;
     }
   }
 

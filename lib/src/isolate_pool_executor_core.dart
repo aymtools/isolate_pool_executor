@@ -45,8 +45,11 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
         assert(maximumPoolSize >= corePoolSize,
             'must maximumPoolSize >= corePoolSize') {
     if (launchCoreImmediately) {
-      for (int i = 0; i < corePoolSize; i++)
-        _coreExecutor[i] = _makeExecutor(true, null);
+      for (int i = 0; i < corePoolSize; i++) {
+        final executor = _makeExecutor(true, null);
+        executor.whenClose = () => _coreExecutor[i] = null;
+        _coreExecutor[i] = executor;
+      }
     }
   }
 
