@@ -12,6 +12,8 @@ part 'isolate_pool_executor_cache.dart';
 
 part 'isolate_pool_executor_single.dart';
 
+part 'future/task_future.dart';
+
 ///饱和策略，当阻塞队列满了，且没有空闲的工作线程，如果继续提交任务，必须采取一种策略处理该任务，提供4种策略:
 enum RejectedExecutionHandler {
   ///直接抛出异常，默认策略；
@@ -124,7 +126,8 @@ abstract class IsolatePoolExecutor {
         debugLabel: debugLabel,
       );
 
-  Future<R> compute<Q, R>(FutureOr<R> Function(Q message) callback, Q message,
+  TaskFuture<R> compute<Q, R>(
+      FutureOr<R> Function(Q message) callback, Q message,
       {String? debugLabel, int what = 0, dynamic tag});
 
   void shutdown({bool force = false});

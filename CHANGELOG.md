@@ -1,3 +1,7 @@
+## 1.1.3
+
+* 将compute的返回值包装为TaskFuture,可查看当前的taskid以及传入的tag相关
+
 ## 1.1.2
 
 * 新增可以指定IsolatePoolExecutor的debugLabel

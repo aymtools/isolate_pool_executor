@@ -128,3 +128,10 @@ int _doTask(int count) {
   }
   return sum;
 }
+
+Future<int> testAwait() async {
+  final pool3 = IsolatePoolExecutor.newCachedIsolatePool();
+  int i = await pool3.compute((message) => 1 * 5, 1);
+  print('await $i');
+  return i;
+}

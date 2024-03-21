@@ -36,12 +36,13 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
   }
 
   @override
-  Future<R> compute<Q, R>(FutureOr<R> Function(Q message) callback, Q message,
+  TaskFuture<R> compute<Q, R>(
+      FutureOr<R> Function(Q message) callback, Q message,
       {String? debugLabel, int what = 0, dynamic tag}) {
     debugLabel ??= callback.toString();
-
-    return _makeTask<R>((d) => callback(d), message, debugLabel, what, tag)
-        ._future;
+    final task =
+        _makeTask<R>((d) => callback(d), message, debugLabel, what, tag);
+    return TaskFuture<R>._(task);
   }
 
   @override
