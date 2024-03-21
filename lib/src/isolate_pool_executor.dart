@@ -41,18 +41,20 @@ abstract class IsolatePoolExecutor {
     FutureOr<void> Function(Map<Object, Object?>? isolateValues)?
         onIsolateCreated,
     String? debugLabel,
-  }) =>
-      _IsolatePoolExecutorCore(
-        corePoolSize: corePoolSize,
-        maximumPoolSize: maximumPoolSize,
-        keepAliveTime: keepAliveTime,
-        taskQueue: taskQueue,
-        handler: handler,
-        isolateValues: isolateValues,
-        launchCoreImmediately: launchCoreImmediately,
-        onIsolateCreated: onIsolateCreated,
-        debugLabel: debugLabel,
-      );
+  }) {
+    assert(maximumPoolSize >= corePoolSize);
+    return _IsolatePoolExecutorCore(
+      corePoolSize: corePoolSize,
+      maximumPoolSize: maximumPoolSize,
+      keepAliveTime: keepAliveTime,
+      taskQueue: taskQueue,
+      handler: handler,
+      isolateValues: isolateValues,
+      launchCoreImmediately: launchCoreImmediately,
+      onIsolateCreated: onIsolateCreated,
+      debugLabel: debugLabel,
+    );
+  }
 
   factory IsolatePoolExecutor.newFixedIsolatePool(
     int nIsolates, {

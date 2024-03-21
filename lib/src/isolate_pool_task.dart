@@ -124,12 +124,12 @@ class _IsolateExecutor {
     timer = Timer(Duration(seconds: _creating), () {
       if (_creating > 3) _creating--;
       if (!isClosed && _sendPort == null) {
-        close()?._submitError(
+        final errStr =
             "Create Isolate(${debugLabel ?? ''}) timeout (wait $time seconds)\n "
-            "Known cause:\n1.Open too many isolates at the same time \n2.https://github.com/flutter/flutter/issues/132731",
-            StackTrace.empty);
-        print("Create Isolate timeout ($time seconds)\n "
-            "Known cause:\n1.Open too many isolates at the same time \n2.https://github.com/flutter/flutter/issues/132731");
+            "Known cause:\n1.Open too many isolates at the same time \n2.https://github.com/flutter/flutter/issues/132731";
+
+        close()?._submitError(errStr, StackTrace.empty);
+        print(errStr);
         onTimeout?.call();
       }
     });
