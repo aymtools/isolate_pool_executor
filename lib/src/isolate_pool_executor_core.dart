@@ -20,7 +20,7 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
 
   final List<_IsolateExecutor?> _coreExecutor;
   final List<_IsolateExecutor> _cacheExecutor;
-  final FutureOr<void> Function(Map<Object, Object?>? isolateValues)?
+  final FutureOr<void> Function(Map<Object, Object?> isolateValues)?
       onIsolateCreated;
 
   final String? debugLabel;

@@ -10,7 +10,7 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
 
   final Map<int, ITask> taskQueue = {};
 
-  final FutureOr<void> Function(Map<Object, Object?>? isolateValues)?
+  final FutureOr<void> Function(Map<Object, Object?> isolateValues)?
       onIsolateCreated;
   final String? debugLabel;
 

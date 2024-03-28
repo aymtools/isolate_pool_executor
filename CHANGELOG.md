@@ -1,3 +1,8 @@
+## 1.1.4
+
+* onIsolateCreated回调中的isolateValues是不可空的默认会生成一个空的map
+* readme中增加在flutter中isolate里调用methodChannel的说明
+
 ## 1.1.3
 
 * 将compute的返回值包装为TaskFuture,可查看当前的taskid以及传入的tag相关
