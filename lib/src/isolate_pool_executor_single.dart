@@ -226,6 +226,9 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
 
     return executor;
   }
+
+  @override
+  bool get isShutdown => _shutdown;
 }
 
 void _workerSingle(List args) {

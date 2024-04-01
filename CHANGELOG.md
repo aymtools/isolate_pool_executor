@@ -1,6 +1,7 @@
 ## 1.1.4
 
 * onIsolateCreated回调中的isolateValues是不可空的默认会生成一个空的map
+* pool新增isShutdown可判断当前是否是已经调用shutdown后的状态
 * readme中增加在flutter中isolate里调用methodChannel的说明
 
 ## 1.1.3

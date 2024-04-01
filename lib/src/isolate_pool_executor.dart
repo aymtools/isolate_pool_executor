@@ -133,6 +133,8 @@ abstract class IsolatePoolExecutor {
       {String? debugLabel, int what = 0, dynamic tag});
 
   void shutdown({bool force = false});
+
+  bool get isShutdown;
 }
 
 final Map<Object, Object?> _isolateValues = {};
