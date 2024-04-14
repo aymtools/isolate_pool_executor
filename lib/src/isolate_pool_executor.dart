@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:collection';
 import 'dart:isolate';
+import 'dart:math';
 
 import 'package:isolate_pool_executor/src/queue/queue_empty.dart';
 
@@ -30,6 +31,8 @@ enum RejectedExecutionHandler {
 }
 
 abstract class IsolatePoolExecutor {
+  /// [launchCoreImmediately] 是否立即启动所有的核心isolate
+  /// 如果值为false时 同时判断[immediatelyStartedCore] 自定义的启动数量，不超过[corePoolSize]
   factory IsolatePoolExecutor({
     required int corePoolSize,
     required int maximumPoolSize,
@@ -38,6 +41,7 @@ abstract class IsolatePoolExecutor {
     required RejectedExecutionHandler handler,
     Map<Object, Object?>? isolateValues,
     bool launchCoreImmediately = false,
+    int immediatelyStartedCore = 0,
     FutureOr<void> Function(Map<Object, Object?> isolateValues)?
         onIsolateCreated,
     String? debugLabel,
@@ -51,17 +55,21 @@ abstract class IsolatePoolExecutor {
       handler: handler,
       isolateValues: isolateValues,
       launchCoreImmediately: launchCoreImmediately,
+      immediatelyStartedCore: immediatelyStartedCore,
       onIsolateCreated: onIsolateCreated,
       debugLabel: debugLabel,
     );
   }
 
+  /// [launchCoreImmediately] 是否立即启动所有的核心isolate
+  /// 如果值为false时 同时判断[immediatelyStartedCore] 自定义的启动数量，不超过[nIsolates]
   factory IsolatePoolExecutor.newFixedIsolatePool(
     int nIsolates, {
     Queue<ITask>? taskQueue,
     RejectedExecutionHandler? handler,
     Map<Object, Object?>? isolateValues,
     bool launchCoreImmediately = false,
+    int immediatelyStartedCore = 0,
     FutureOr<void> Function(Map<Object, Object?> isolateValues)?
         onIsolateCreated,
     String? debugLabel,
@@ -74,6 +82,7 @@ abstract class IsolatePoolExecutor {
         handler: handler ?? RejectedExecutionHandler.abortPolicy,
         isolateValues: isolateValues,
         launchCoreImmediately: launchCoreImmediately,
+        immediatelyStartedCore: immediatelyStartedCore,
         onIsolateCreated: onIsolateCreated,
         debugLabel: debugLabel,
       );

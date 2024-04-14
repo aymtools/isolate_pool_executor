@@ -38,14 +38,19 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
       this.isolateValues,
       bool launchCoreImmediately = false,
       this.onIsolateCreated,
+      int immediatelyStartedCore = 0,
       this.debugLabel})
       : _coreExecutor = List.filled(corePoolSize, null),
         cachePoolSize = maximumPoolSize - corePoolSize,
         _cacheExecutor = [],
         assert(maximumPoolSize >= corePoolSize,
             'must maximumPoolSize >= corePoolSize') {
-    if (launchCoreImmediately) {
-      for (int i = 0; i < corePoolSize; i++) {
+    final immediatelyStarted = launchCoreImmediately
+        ? corePoolSize
+        : min(immediatelyStartedCore, corePoolSize);
+
+    if (immediatelyStarted > 0) {
+      for (int i = 0; i < immediatelyStarted; i++) {
         final executor = _makeExecutor(true, null);
         executor.whenClose = () => _coreExecutor[i] = null;
         _coreExecutor[i] = executor;

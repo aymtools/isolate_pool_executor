@@ -53,6 +53,7 @@ void willKillPool() {
 ```
 
 If you need to use MethodChannel in an isolate in Flutter, you can make the following adjustments.
+
 Note: This feature requires Flutter SDK >= 3.7.
 
 ```dart

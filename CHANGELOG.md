@@ -1,3 +1,8 @@
+## 1.1.5
+
+* IsolatePoolExecutor和IsolatePoolExecutor.newFixedIsolatePool增加启动参数immediatelyStartedCore
+  可自定义立即启动isolate的数量
+
 ## 1.1.4
 
 * onIsolateCreated回调中的isolateValues是不可空的默认会生成一个空的map
