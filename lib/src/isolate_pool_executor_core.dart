@@ -25,8 +25,12 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
 
   final String? debugLabel;
 
-  bool _shutdown = false;
+  final int onIsolateCreateTimeoutTimesDoNotCreateNew = -1;
 
+  bool _shutdown = false;
+  bool _canCreateNewIsolate = true;
+
+  int _isolateCreateTimeoutCounter = 0;
   int _isolateIndex = 0;
 
   _IsolatePoolExecutorCore(
@@ -39,6 +43,7 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
       bool launchCoreImmediately = false,
       this.onIsolateCreated,
       int immediatelyStartedCore = 0,
+      int onIsolateCreateTimeoutTimesDoNotCreateNew = -1,
       this.debugLabel})
       : _coreExecutor = List.filled(corePoolSize, null),
         cachePoolSize = maximumPoolSize - corePoolSize,
@@ -166,15 +171,30 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
     });
   }
 
-  _IsolateExecutor? _emitTask(ITask task) {
+  _isolateCreateSupervisor(_IsolateExecutor executor) {
+    if (onIsolateCreateTimeoutTimesDoNotCreateNew > 0) {
+      executor.onTimeout = () {
+        _isolateCreateTimeoutCounter++;
+        if (_isolateCreateTimeoutCounter >=
+            onIsolateCreateTimeoutTimesDoNotCreateNew) {
+          _canCreateNewIsolate = false;
+        }
+      };
+    }
+  }
+
+  _IsolateExecutor? _emitTask(ITask task,
+      {bool jumpCheckCanCreateNewIsolate = false}) {
     int i = 0, j = corePoolSize;
     for (; i < j; i++) {
       final e = _coreExecutor[i];
       if (e == null) {
-        _IsolateExecutor executor = _makeExecutor(true, task);
-        _coreExecutor[i] = executor;
-        executor.whenClose = () => _coreExecutor[i] = null;
-        return executor;
+        if (_canCreateNewIsolate || jumpCheckCanCreateNewIsolate) {
+          _IsolateExecutor executor = _makeExecutor(true, task);
+          _coreExecutor[i] = executor;
+          executor.whenClose = () => _coreExecutor[i] = null;
+          return executor;
+        }
       } else if (e.isIdle) {
         e.emit(task);
         return e;
@@ -191,12 +211,21 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
     }
     if (keepAliveTime == Duration.zero) {
       return _makeNoCacheExecutor(task);
-    } else {
+    } else if (_canCreateNewIsolate || jumpCheckCanCreateNewIsolate) {
       _IsolateExecutor executor = _makeExecutor(false, task);
       executor.whenClose = () => _cacheExecutor.remove(executor);
       _cacheExecutor.add(executor);
       return executor;
     }
+    if (!jumpCheckCanCreateNewIsolate) {
+      if (!_canCreateNewIsolate &&
+          (_coreExecutor.isEmpty && _cacheExecutor.isEmpty)) {
+        //当前无法创建新isolate，并且也没有可用的isolate时  那就继续尝试创建
+        return _emitTask(task, jumpCheckCanCreateNewIsolate: true);
+      }
+    }
+
+    return null;
     // _IsolateExecutor executor = keepAliveTime == Duration.zero
     //     ? _makeNoCacheExecutor(task)
     //     : _makeExecutor(false, task);
@@ -218,6 +247,8 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
 
     _IsolateExecutor executor = _IsolateExecutor(receivePort, task, debugLabel);
 
+    _isolateCreateSupervisor(executor);
+
     receivePort.handler = ((message) {
       if (message == null) {
         //执行了Isolate exit
@@ -230,6 +261,10 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
         return;
       } else if (message is SendPort) {
         executor.sendPort = message;
+
+        _canCreateNewIsolate = true;
+        _isolateCreateTimeoutCounter = 0;
+
         if (isCore && executor.isIdle) {
           _poolTask(executor);
         }

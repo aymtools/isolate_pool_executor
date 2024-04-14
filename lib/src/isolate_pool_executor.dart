@@ -44,6 +44,7 @@ abstract class IsolatePoolExecutor {
     int immediatelyStartedCore = 0,
     FutureOr<void> Function(Map<Object, Object?> isolateValues)?
         onIsolateCreated,
+    int onIsolateCreateTimeoutTimesDoNotCreateNew = 0,
     String? debugLabel,
   }) {
     assert(maximumPoolSize >= corePoolSize);
@@ -57,6 +58,8 @@ abstract class IsolatePoolExecutor {
       launchCoreImmediately: launchCoreImmediately,
       immediatelyStartedCore: immediatelyStartedCore,
       onIsolateCreated: onIsolateCreated,
+      onIsolateCreateTimeoutTimesDoNotCreateNew:
+          onIsolateCreateTimeoutTimesDoNotCreateNew,
       debugLabel: debugLabel,
     );
   }
@@ -72,6 +75,7 @@ abstract class IsolatePoolExecutor {
     int immediatelyStartedCore = 0,
     FutureOr<void> Function(Map<Object, Object?> isolateValues)?
         onIsolateCreated,
+    int onIsolateCreateTimeoutTimesDoNotCreateNew = 0,
     String? debugLabel,
   }) =>
       _IsolatePoolExecutorCore(
@@ -84,6 +88,8 @@ abstract class IsolatePoolExecutor {
         launchCoreImmediately: launchCoreImmediately,
         immediatelyStartedCore: immediatelyStartedCore,
         onIsolateCreated: onIsolateCreated,
+        onIsolateCreateTimeoutTimesDoNotCreateNew:
+            onIsolateCreateTimeoutTimesDoNotCreateNew,
         debugLabel: debugLabel,
       );
 

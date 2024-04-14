@@ -124,9 +124,8 @@ class _IsolateExecutor {
     timer = Timer(Duration(seconds: _creating), () {
       if (_creating > 3) _creating--;
       if (!isClosed && _sendPort == null) {
-        final errStr =
-            "Create Isolate(${debugLabel ?? ''}) timeout (wait $time seconds)\n "
-            "Known cause:\n1.Open too many isolates at the same time \n2.https://github.com/flutter/flutter/issues/132731";
+        final errStr = CreateIsolateTimeoutException(
+            debugLabel: debugLabel, waitTime: time);
 
         close()?._submitError(errStr, StackTrace.empty);
         print(errStr);
@@ -200,5 +199,19 @@ extension _ListFirstWhereOrNullExt<E> on List<E> {
       if (test(element)) return element;
     }
     return null;
+  }
+}
+
+class CreateIsolateTimeoutException implements Exception {
+  final String? debugLabel;
+
+  final int waitTime;
+
+  CreateIsolateTimeoutException(
+      {required this.debugLabel, required this.waitTime});
+
+  String toString() {
+    return "Create Isolate(${debugLabel ?? ''}) timeout (wait $waitTime seconds)\n "
+        "Known cause:\n1.Open too many isolates at the same time \n2.https://github.com/flutter/flutter/issues/132731";
   }
 }
