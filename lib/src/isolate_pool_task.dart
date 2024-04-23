@@ -86,6 +86,14 @@ enum IsolateExecutorState {
 
 int _creating = 3;
 
+// Future<Null> get _waitOtherImmediatelyStarted async {
+//   if (_creating < 5) {
+//     return Future.value();
+//   }
+//   await Future.delayed(Duration(seconds: 1));
+//   return _waitOtherImmediatelyStarted;
+// }
+
 class _IsolateExecutor {
   final RawReceivePort _receivePort;
   final String? debugLabel;

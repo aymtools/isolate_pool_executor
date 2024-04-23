@@ -25,7 +25,7 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
 
   final String? debugLabel;
 
-  final int onIsolateCreateTimeoutTimesDoNotCreateNew = -1;
+  final int onIsolateCreateTimeoutTimesDoNotCreateNew;
 
   bool _shutdown = false;
   bool _canCreateNewIsolate = true;
@@ -48,6 +48,10 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
       : _coreExecutor = List.filled(corePoolSize, null),
         cachePoolSize = maximumPoolSize - corePoolSize,
         _cacheExecutor = [],
+        onIsolateCreateTimeoutTimesDoNotCreateNew =
+            onIsolateCreateTimeoutTimesDoNotCreateNew > 0
+                ? onIsolateCreateTimeoutTimesDoNotCreateNew
+                : -1,
         assert(maximumPoolSize >= corePoolSize,
             'must maximumPoolSize >= corePoolSize') {
     final immediatelyStarted = launchCoreImmediately
