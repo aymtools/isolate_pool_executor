@@ -1,3 +1,10 @@
+## 1.2.0
+
+* 新增一个参数onIsolateCreateTimeoutTimesDoNotCreateNew, 当创建isolate时连续出现n次超时，则不再创建新的，只使用当前已经启动完成的,
+  如果未出现创建超时，则正常使用包含m个核心的isolate，和其他的cached isolate
+* 可利用此特性来缓解 https://github.com/flutter/flutter/issues/132731
+  参见 [readme](https://github.com/aymtools/isolate_pool_executor/blob/master/README.md)
+
 ## 1.1.5
 
 * IsolatePoolExecutor和IsolatePoolExecutor.newFixedIsolatePool增加启动参数immediatelyStartedCore
