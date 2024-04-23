@@ -86,6 +86,43 @@ void doSomething() async {
 ///...doSomething
 ```
 
+If you encounter similar issues(https://github.com/flutter/flutter/issues/132731) in Flutter, you can refer to the following mitigation solutions.
+
+```dart
+late final Future<R> Function<M, R>(
+    FutureOr<R> Function(M message) callback, M message,
+    {String? debugLabel}) compute;
+
+void initPoolCompute() {
+  final pool = Platform.isAndroid
+      ? IsolatePoolExecutor(
+    corePoolSize: 4,
+    maximumPoolSize: 2147483647,
+    keepAliveTime: const Duration(seconds: 30),
+    //Start the 4 core isolates immediately.
+    launchCoreImmediately: true,
+    //If isolate creation times out twice consecutively, no new ones will be created, only the ones already started will be used.
+    //If there's no timeout during creation, use the isolate containing the 4 cores and automatically destroy other cached isolates.
+    onIsolateCreateTimeoutTimesDoNotCreateNew: 2,
+  )
+      : IsolatePoolExecutor.newCachedIsolatePool(
+      keepAliveTime: const Duration(seconds: 30));
+
+  compute = pool.compute;
+}
+
+void main() {
+  // init pool
+  initPoolCompute();
+
+  // ... doSomething
+  compute((arg) {
+    // ... doSomething
+  }, 0);
+}
+
+```
+
 See [example](https://github.com/aymtools/isolate_pool_executor/blob/master/example/isolate_pool_executor_example.dart)
 for detailed test
 case.
