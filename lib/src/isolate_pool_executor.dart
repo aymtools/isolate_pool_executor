@@ -5,15 +5,11 @@ import 'dart:math';
 
 import 'package:isolate_pool_executor/src/queue/queue_empty.dart';
 
-part 'isolate_pool_task.dart';
-
-part 'isolate_pool_executor_core.dart';
-
-part 'isolate_pool_executor_cache.dart';
-
-part 'isolate_pool_executor_single.dart';
-
 part 'future/task_future.dart';
+part 'isolate_pool_executor_cache.dart';
+part 'isolate_pool_executor_core.dart';
+part 'isolate_pool_executor_single.dart';
+part 'isolate_pool_task.dart';
 
 ///饱和策略，当阻塞队列满了，且没有空闲的工作线程，如果继续提交任务，必须采取一种策略处理该任务，提供4种策略:
 enum RejectedExecutionHandler {
@@ -30,6 +26,7 @@ enum RejectedExecutionHandler {
   discardPolicy,
 }
 
+/// 池化的isolate
 abstract class IsolatePoolExecutor {
   /// [launchCoreImmediately] 是否立即启动所有的核心isolate
   /// 如果值为false时 同时判断[immediatelyStartedCore] 自定义的启动数量，不超过[corePoolSize]
@@ -123,7 +120,7 @@ abstract class IsolatePoolExecutor {
               debugLabel: debugLabel,
             );
 
-  ///
+  /// 创建一个无上限数量的缓存可用pool
   factory IsolatePoolExecutor.newCachedIsolatePool({
     Duration keepAliveTime = const Duration(seconds: 10),
     Map<Object, Object?>? isolateValues,
@@ -143,17 +140,22 @@ abstract class IsolatePoolExecutor {
         debugLabel: debugLabel,
       );
 
+  /// 提交一个任务
   TaskFuture<R> compute<Q, R>(
       FutureOr<R> Function(Q message) callback, Q message,
       {String? debugLabel, int what = 0, dynamic tag});
 
+  /// 关闭当前的pool
   void shutdown({bool force = false});
 
+  /// 是否正在处于关闭中或这正在关闭
   bool get isShutdown;
 }
 
 final Map<Object, Object?> _isolateValues = {};
 
+/// 用以存放到isolate中数据
 extension IsolateDataExt on Isolate {
+  /// 获取存放在isolate中的数据
   dynamic operator [](Object? key) => _isolateValues[key];
 }

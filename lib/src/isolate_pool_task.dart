@@ -84,7 +84,14 @@ enum IsolateExecutorState {
   close,
 }
 
-int _creating = 3;
+int _creating = () {
+  int t = 3;
+  assert(() {
+    t = 6;
+    return true;
+  }());
+  return t;
+}();
 
 // Future<Null> get _waitOtherImmediatelyStarted async {
 //   if (_creating < 5) {

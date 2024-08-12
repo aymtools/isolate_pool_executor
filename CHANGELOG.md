@@ -1,3 +1,7 @@
+## 1.2.1
+
+* 在非release模式下(assert 来判断),默认的创建等待时间改为6s，release模式不影响依旧为3s
+
 ## 1.2.0
 
 * 新增一个参数onIsolateCreateTimeoutTimesDoNotCreateNew, 当创建isolate时连续出现n次超时，则不再创建新的，只使用当前已经启动完成的,
