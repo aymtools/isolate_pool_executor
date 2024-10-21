@@ -85,13 +85,13 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
         for (var e in _coreExecutor) {
           e?.close();
         }
-      } catch (ignore) {}
+      } catch (_) {}
     } else if (taskQueue.isEmpty) {
       try {
         for (var e in _coreExecutor) {
           e?.close();
         }
-      } catch (ignore) {}
+      } catch (_) {}
     }
   }
 
@@ -120,7 +120,7 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
         taskQueue.add(task);
       }
       _poolTask();
-    } catch (ignore) {
+    } catch (_) {
       switch (handler) {
         case RejectedExecutionHandler.abortPolicy:
           rethrow;
@@ -352,7 +352,7 @@ void _worker(List args) {
           await result;
         }
       }
-    } catch (ignore) {}
+    } catch (_) {}
 
     final _Task? task = args[3];
 

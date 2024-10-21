@@ -52,7 +52,7 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
       try {
         _coreExecutor[0]?.close();
         _coreExecutor[0] = null;
-      } catch (ignore) {}
+      } catch (_) {}
     }
   }
 
@@ -253,7 +253,7 @@ void _workerSingle(List args) {
           await result;
         }
       }
-    } catch (ignore) {}
+    } catch (_) {}
 
     final _Task? task = args[3];
 
@@ -277,6 +277,7 @@ void _workerSingle(List args) {
 
       _poolTask = () {
         scheduleMicrotask(() {
+          if (doingTask != null) return;
           while (doingTask == null && taskQueue.isNotEmpty) {
             final task = taskQueue.removeFirst();
             doingTask = task._task;

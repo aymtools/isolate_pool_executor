@@ -1,73 +1,89 @@
-## 1.2.1
+## Version 1.2.2
 
-* 在非release模式下(assert 来判断),默认的创建等待时间改为6s，release模式不影响依旧为3s
+* Fixed the task execution exception when `taskQueueInIsolate` is set to `true` in `SingleIsolate`.
 
-## 1.2.0
+## Version 1.2.1
 
-* 新增一个参数onIsolateCreateTimeoutTimesDoNotCreateNew, 当创建isolate时连续出现n次超时，则不再创建新的，只使用当前已经启动完成的,
-  如果未出现创建超时，则正常使用包含m个核心的isolate，和其他的cached isolate
-* 可利用此特性来缓解 https://github.com/flutter/flutter/issues/132731
-  参见 [readme](https://github.com/aymtools/isolate_pool_executor/blob/master/README.md)
+* In non-release mode (determined by `assert`), the default creation waiting time is changed to 6
+  seconds. In release mode, it remains unchanged at 3 seconds.
 
-## 1.1.5
+## Version 1.2.0
 
-* IsolatePoolExecutor和IsolatePoolExecutor.newFixedIsolatePool增加启动参数immediatelyStartedCore
-  可自定义立即启动isolate的数量
+* Added a new parameter `onIsolateCreateTimeoutTimesDoNotCreateNew`. If isolate creation times
+  out `n` consecutive times, no new isolates will be created, and only the already initialized
+  isolates will be used. If no timeouts occur, the pool will use the isolates with `m` cores, along
+  with other cached isolates.
+* This feature can help alleviate [this issue](https://github.com/flutter/flutter/issues/132731).
+  See the [README](https://github.com/aymtools/isolate_pool_executor/blob/master/README.md) for more
+  details.
 
-## 1.1.4
+## Version 1.1.5
 
-* onIsolateCreated回调中的isolateValues是不可空的默认会生成一个空的map
-* pool新增isShutdown可判断当前是否是已经调用shutdown后的状态
-* readme中增加在flutter中isolate里调用methodChannel的说明
+* Added the `immediatelyStartedCore` parameter to `IsolatePoolExecutor`
+  and `IsolatePoolExecutor.newFixedIsolatePool`, allowing customization of the number of isolates
+  that start immediately.
 
-## 1.1.3
+## Version 1.1.4
 
-* 将compute的返回值包装为TaskFuture,可查看当前的taskid以及传入的tag相关
+* The `isolateValues` in the `onIsolateCreated` callback is now non-nullable and will default to an
+  empty map.
+* Added `isShutdown` to the pool to check if `shutdown` has been called.
+* Updated the README to include instructions on calling `MethodChannel` from an isolate in Flutter.
 
-## 1.1.2
+## Version 1.1.3
 
-* 新增可以指定IsolatePoolExecutor的debugLabel
+* The return value of `compute` is now wrapped in `TaskFuture`, allowing you to view the
+  current `taskId` and related `tag`.
 
-## 1.1.1
+## Version 1.1.2
 
-* 增加创建一个参数onIsolateCreated当Isolate创建后会立即调用，配合isolateValues可以实现初始化当前个Isolate的一些数据。
-* 例如： https://medium.com/flutter/introducing-background-isolate-channels-7a299609cad8 此需求
-* Isolate直接的交互使用RawReceivePort
+* Added support for specifying a `debugLabel` for `IsolatePoolExecutor`.
 
-## 1.1.0
+## Version 1.1.1
 
-* 优化首次启动isolate时直接携带任务，减少一次发送，同时调整isolated的空闲判断
-* 增加验证启动Isolate的超时判断，已知原因 https://github.com/flutter/flutter/issues/132731
-* 增加一个参数launchCoreImmediately默认为false 立即启动所有的core Isolate
+* Added a new `onIsolateCreated` parameter, which is called immediately after an isolate is created.
+  This, along with `isolateValues`, allows initialization of data for the isolate.
+*
+Example: [Introducing background isolate channels](https://medium.com/flutter/introducing-background-isolate-channels-7a299609cad8).
+* Interaction with isolates now uses `RawReceivePort`.
 
-## 1.0.6
+## Version 1.1.0
 
-* newCachedIsolatePool的队列修正为QueueEmpty不可添加任何任务
+* Optimized initial isolate startup by directly assigning tasks, reducing one send operation, and
+  improved idle state detection for isolates.
+* Added timeout validation for isolate startup due
+  to [this known issue](https://github.com/flutter/flutter/issues/132731).
+* Added a parameter `launchCoreImmediately` (default `false`), which starts all core isolates
+  immediately.
 
-## 1.0.5
+## Version 1.0.6
 
-* 当send task失败时抛出异常
-* isolate中的worker增加全局异常捕获
+* Fixed `QueueEmpty` in `newCachedIsolatePool` to prevent adding any tasks.
 
-## 1.0.4
+## Version 1.0.5
 
-* 增加常用的扩展方法
+* Threw an exception when sending tasks failed.
+* Added global exception handling for workers in isolates.
 
-## 1.0.3
+## Version 1.0.4
 
-* 优化IsolateNoCache的通信次数，使性能接近Isolate.run
+* Added common extension methods.
 
-## 1.0.2
+## Version 1.0.3
 
-* 增加isolate初始化时存入map values
-* keepAliveTime为0时优化isolate的退出机制
-* 优化isolate之间的数据传
+* Optimized communication times in `IsolateNoCache`, bringing performance close to `Isolate.run`.
 
-## 1.0.1
+## Version 1.0.2
 
-* 优化代码结构，新增单isolate时可以不使用队列保存task直接发送到isolate
+* Added support for storing `map` values during isolate initialization.
+* Optimized isolate exit mechanism when `keepAliveTime` is set to 0.
+* Improved data transfer between isolates.
 
-## 1.0.0
+## Version 1.0.1
 
-* 首个版本完成，默认实现3个常用创建方式
+* Refined code structure. When using a single isolate, tasks can be sent directly to the isolate
+  without a queue.
 
+## Version 1.0.0
+
+* First version completed with 3 common creation methods implemented by default.

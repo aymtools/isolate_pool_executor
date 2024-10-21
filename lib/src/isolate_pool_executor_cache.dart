@@ -95,7 +95,7 @@ void _workerNoCache(List args) {
           await result;
         }
       }
-    } catch (ignore) {}
+    } catch (_) {}
 
     _Task task = args[1];
 
