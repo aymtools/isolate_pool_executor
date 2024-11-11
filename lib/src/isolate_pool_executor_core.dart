@@ -97,8 +97,9 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
 
   ITask<R> _makeTask<R>(dynamic Function(dynamic p) run, dynamic p,
       String debugLabel, int what, dynamic tag) {
-    if (_shutdown)
+    if (_shutdown) {
       throw 'IsolatePoolExecutor${this.debugLabel?.isNotEmpty == true ? '-${this.debugLabel}' : ''} is shutdown';
+    }
 
     ITask<R> task = ITask<R>._task(run, p, debugLabel, what, tag);
 

@@ -19,6 +19,12 @@ class ITask<R> {
   final dynamic tag;
   final int what;
 
+  /// 只有在任务提交前可以使用 提交后为了优化将会置为null
+  dynamic get taskMessage => _task?.message;
+
+  /// 一般用于配合队列 缓存 对task按一定规则计算排序时 计算的结果
+  dynamic obj;
+
   ITask._task(
     FutureOr Function(dynamic q) function,
     dynamic message,

@@ -1,13 +1,17 @@
-## Version 1.2.2
+## 1.2.3
+
+* Allow obtaining the content of the message before submitting the task for calculating the order.
+
+## 1.2.2
 
 * Fixed the task execution exception when `taskQueueInIsolate` is set to `true` in `SingleIsolate`.
 
-## Version 1.2.1
+## 1.2.1
 
 * In non-release mode (determined by `assert`), the default creation waiting time is changed to 6
   seconds. In release mode, it remains unchanged at 3 seconds.
 
-## Version 1.2.0
+## 1.2.0
 
 * Added a new parameter `onIsolateCreateTimeoutTimesDoNotCreateNew`. If isolate creation times
   out `n` consecutive times, no new isolates will be created, and only the already initialized
@@ -17,37 +21,39 @@
   See the [README](https://github.com/aymtools/isolate_pool_executor/blob/master/README.md) for more
   details.
 
-## Version 1.1.5
+## 1.1.5
 
 * Added the `immediatelyStartedCore` parameter to `IsolatePoolExecutor`
   and `IsolatePoolExecutor.newFixedIsolatePool`, allowing customization of the number of isolates
   that start immediately.
 
-## Version 1.1.4
+## 1.1.4
 
 * The `isolateValues` in the `onIsolateCreated` callback is now non-nullable and will default to an
   empty map.
 * Added `isShutdown` to the pool to check if `shutdown` has been called.
 * Updated the README to include instructions on calling `MethodChannel` from an isolate in Flutter.
 
-## Version 1.1.3
+## 1.1.3
 
 * The return value of `compute` is now wrapped in `TaskFuture`, allowing you to view the
   current `taskId` and related `tag`.
 
-## Version 1.1.2
+## 1.1.2
 
 * Added support for specifying a `debugLabel` for `IsolatePoolExecutor`.
 
-## Version 1.1.1
+## 1.1.1
 
 * Added a new `onIsolateCreated` parameter, which is called immediately after an isolate is created.
   This, along with `isolateValues`, allows initialization of data for the isolate.
 *
+
 Example: [Introducing background isolate channels](https://medium.com/flutter/introducing-background-isolate-channels-7a299609cad8).
+
 * Interaction with isolates now uses `RawReceivePort`.
 
-## Version 1.1.0
+## 1.1.0
 
 * Optimized initial isolate startup by directly assigning tasks, reducing one send operation, and
   improved idle state detection for isolates.
@@ -56,34 +62,34 @@ Example: [Introducing background isolate channels](https://medium.com/flutter/in
 * Added a parameter `launchCoreImmediately` (default `false`), which starts all core isolates
   immediately.
 
-## Version 1.0.6
+## 1.0.6
 
 * Fixed `QueueEmpty` in `newCachedIsolatePool` to prevent adding any tasks.
 
-## Version 1.0.5
+## 1.0.5
 
 * Threw an exception when sending tasks failed.
 * Added global exception handling for workers in isolates.
 
-## Version 1.0.4
+## 1.0.4
 
 * Added common extension methods.
 
-## Version 1.0.3
+## 1.0.3
 
 * Optimized communication times in `IsolateNoCache`, bringing performance close to `Isolate.run`.
 
-## Version 1.0.2
+## 1.0.2
 
 * Added support for storing `map` values during isolate initialization.
 * Optimized isolate exit mechanism when `keepAliveTime` is set to 0.
 * Improved data transfer between isolates.
 
-## Version 1.0.1
+## 1.0.1
 
 * Refined code structure. When using a single isolate, tasks can be sent directly to the isolate
   without a queue.
 
-## Version 1.0.0
+## 1.0.0
 
 * First version completed with 3 common creation methods implemented by default.
