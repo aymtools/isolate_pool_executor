@@ -33,6 +33,8 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
   int _isolateCreateTimeoutCounter = 0;
   int _isolateIndex = 0;
 
+  final TaskInvoker? customTaskInvoker;
+
   _IsolatePoolExecutorCore(
       {required this.corePoolSize,
       required this.maximumPoolSize,
@@ -44,6 +46,7 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
       this.onIsolateCreated,
       int immediatelyStartedCore = 0,
       int onIsolateCreateTimeoutTimesDoNotCreateNew = -1,
+      this.customTaskInvoker,
       this.debugLabel})
       : _coreExecutor = List.filled(corePoolSize, null),
         cachePoolSize = maximumPoolSize - corePoolSize,
@@ -121,16 +124,22 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
         taskQueue.add(task);
       }
       _poolTask();
-    } catch (_) {
+    } catch (error) {
       switch (handler) {
         case RejectedExecutionHandler.abortPolicy:
-          rethrow;
+          // 直接通知 task执行异常
+          task._computer.completeError(
+              RejectedExecutionException(error), StackTrace.current);
+          break;
         case RejectedExecutionHandler.callerRunsPolicy:
           _runTask(task);
           break;
         case RejectedExecutionHandler.discardOldestPolicy:
-          taskQueue.removeFirst();
-          _addTask(task, header: header);
+          if (taskQueue.isNotEmpty) {
+            taskQueue.removeFirst();
+            _addTask(task, header: header);
+          }
+          // 如果已经是空的还添加不进去意味着将自己也扔掉
           break;
         case RejectedExecutionHandler.discardPolicy:
           break;
@@ -143,7 +152,8 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
     if (task == null) return;
     final result = task.makeResult();
     try {
-      dynamic r = task.function(task.message);
+      final invoker = customTaskInvoker ?? _taskInvoker;
+      dynamic r = invoker(task.taskId, task.function, task.message);
       if (r is Future) {
         r = await r;
       }
@@ -303,12 +313,13 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
       }
     });
 
-    final args = List<dynamic>.filled(5, null);
+    final args = List<dynamic>.filled(6, null);
     args[0] = receivePort.sendPort;
     if (!isCore) args[1] = keepAliveTime;
     args[2] = isolateValues;
     args[3] = task?._task;
     args[4] = onIsolateCreated;
+    args[5] = customTaskInvoker;
 
     Isolate.spawn(_worker, args,
             onError: receivePort.sendPort,
@@ -356,6 +367,11 @@ void _worker(List args) {
     } catch (_) {}
 
     final _Task? task = args[3];
+
+    final TaskInvoker? customInvoker = args[5];
+    if (customInvoker != null) {
+      _taskInvoker = customInvoker;
+    }
 
     void Function() startListen;
     if (duration == null) {

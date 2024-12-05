@@ -19,7 +19,7 @@ enum RejectedExecutionHandler {
   ///用调用者所在的Isolate来执行任务；
   callerRunsPolicy,
 
-  ///丢弃阻塞队列中靠最前的任务，并执行当前任务；
+  ///丢弃阻塞队列中靠最前的任务；
   discardOldestPolicy,
 
   ///直接丢弃任务；
@@ -42,6 +42,7 @@ abstract class IsolatePoolExecutor {
     FutureOr<void> Function(Map<Object, Object?> isolateValues)?
         onIsolateCreated,
     int onIsolateCreateTimeoutTimesDoNotCreateNew = 0,
+    TaskInvoker? customTaskInvoker,
     String? debugLabel,
   }) {
     assert(maximumPoolSize >= corePoolSize);
@@ -57,6 +58,7 @@ abstract class IsolatePoolExecutor {
       onIsolateCreated: onIsolateCreated,
       onIsolateCreateTimeoutTimesDoNotCreateNew:
           onIsolateCreateTimeoutTimesDoNotCreateNew,
+      customTaskInvoker: customTaskInvoker,
       debugLabel: debugLabel,
     );
   }
@@ -73,6 +75,7 @@ abstract class IsolatePoolExecutor {
     FutureOr<void> Function(Map<Object, Object?> isolateValues)?
         onIsolateCreated,
     int onIsolateCreateTimeoutTimesDoNotCreateNew = 0,
+    TaskInvoker? customTaskInvoker,
     String? debugLabel,
   }) =>
       _IsolatePoolExecutorCore(
@@ -87,6 +90,7 @@ abstract class IsolatePoolExecutor {
         onIsolateCreated: onIsolateCreated,
         onIsolateCreateTimeoutTimesDoNotCreateNew:
             onIsolateCreateTimeoutTimesDoNotCreateNew,
+        customTaskInvoker: customTaskInvoker,
         debugLabel: debugLabel,
       );
 
@@ -100,14 +104,17 @@ abstract class IsolatePoolExecutor {
     bool launchCoreImmediately = false,
     FutureOr<void> Function(Map<Object, Object?> isolateValues)?
         onIsolateCreated,
+    TaskInvoker? customTaskInvoker,
     String? debugLabel,
   }) =>
       taskQueueInIsolate
           ? _IsolatePoolSingleExecutor(
               taskQueueFactory: taskQueueFactory,
+              handler: handler ?? RejectedExecutionHandler.abortPolicy,
               isolateValues: isolateValues,
               launchCoreImmediately: launchCoreImmediately,
               onIsolateCreated: onIsolateCreated,
+              customTaskInvoker: customTaskInvoker,
               debugLabel: debugLabel,
             )
           : IsolatePoolExecutor.newFixedIsolatePool(
@@ -117,6 +124,7 @@ abstract class IsolatePoolExecutor {
               isolateValues: isolateValues,
               launchCoreImmediately: launchCoreImmediately,
               onIsolateCreated: onIsolateCreated,
+              customTaskInvoker: customTaskInvoker,
               debugLabel: debugLabel,
             );
 
@@ -126,6 +134,7 @@ abstract class IsolatePoolExecutor {
     Map<Object, Object?>? isolateValues,
     FutureOr<void> Function(Map<Object, Object?> isolateValues)?
         onIsolateCreated,
+    TaskInvoker? customTaskInvoker,
     String? debugLabel,
   }) =>
       _IsolatePoolExecutorCore(
@@ -137,6 +146,7 @@ abstract class IsolatePoolExecutor {
         handler: RejectedExecutionHandler.abortPolicy,
         isolateValues: isolateValues,
         onIsolateCreated: onIsolateCreated,
+        customTaskInvoker: customTaskInvoker,
         debugLabel: debugLabel,
       );
 
@@ -158,4 +168,20 @@ final Map<Object, Object?> _isolateValues = {};
 extension IsolateDataExt on Isolate {
   /// 获取存放在isolate中的数据
   dynamic operator [](Object? key) => _isolateValues[key];
+}
+
+/// 自定义对于task的执行器
+typedef TaskInvoker = Future Function(
+    int taskId, FutureOr Function(dynamic) function, dynamic message);
+
+/// 当策略为RejectedExecutionHandler.abortPolicy 且无法添加到Queue时 的异常
+class RejectedExecutionException implements Exception {
+  final dynamic error;
+
+  RejectedExecutionException(this.error);
+
+  @override
+  String toString() {
+    return 'RejectedExecutionException $error';
+  }
 }

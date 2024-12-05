@@ -10,8 +10,13 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
 
   final Map<int, ITask> taskQueue = {};
 
+  final RejectedExecutionHandler? handler;
+
   final FutureOr<void> Function(Map<Object, Object?> isolateValues)?
       onIsolateCreated;
+
+  final TaskInvoker? customTaskInvoker;
+
   final String? debugLabel;
 
   bool _shutdown = false;
@@ -23,11 +28,18 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
 
   _IsolatePoolSingleExecutor(
       {Queue<ITask> Function()? taskQueueFactory,
+      this.handler,
       this.isolateValues,
       bool launchCoreImmediately = false,
       this.onIsolateCreated,
+      this.customTaskInvoker,
       this.debugLabel})
       : taskQueueFactory = taskQueueFactory {
+    assert(
+        taskQueueFactory == null ||
+            handler != RejectedExecutionHandler.callerRunsPolicy,
+        'When the queue is within an Isolate, it cannot be executed in the calling Isolate.');
+
     if (launchCoreImmediately) {
       final executor = _makeExecutor(null);
       executor.whenClose = () => _coreExecutor[0] = null;
@@ -200,12 +212,14 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
         creatingCache.clear();
       }
     });
-    final args = List<dynamic>.filled(5, null);
+    final args = List<dynamic>.filled(7, null);
     args[0] = receivePort.sendPort;
     args[1] = taskQueueFactory;
     args[2] = isolateValues;
     args[3] = fistTask?._task;
     args[4] = onIsolateCreated;
+    args[5] = handler;
+    args[6] = customTaskInvoker;
 
     Isolate.spawn(_workerSingle, args,
             onError: receivePort.sendPort,
@@ -258,6 +272,14 @@ void _workerSingle(List args) {
 
     final _Task? task = args[3];
 
+    final RejectedExecutionHandler handler =
+        args[5] ?? RejectedExecutionHandler.abortPolicy;
+
+    final TaskInvoker? customInvoker = args[6];
+    if (customInvoker != null) {
+      _taskInvoker = customInvoker;
+    }
+
     void Function() startListen;
 
     if (taskQueueFactory == null) {
@@ -288,10 +310,39 @@ void _workerSingle(List args) {
           }
         });
       };
+      void addTask(ITask task) {
+        try {
+          taskQueue.add(task);
+        } catch (error) {
+          switch (handler) {
+            case RejectedExecutionHandler.abortPolicy:
+              // 直接通知 task执行异常
+              final errResult = task._task?.makeResult();
+              if (errResult != null) {
+                errResult.err = RejectedExecutionException(error);
+                errResult.stackTrace = StackTrace.current;
+                sendPort.send(errResult);
+              }
+              break;
+            case RejectedExecutionHandler.callerRunsPolicy:
+              break;
+            case RejectedExecutionHandler.discardOldestPolicy:
+              if (taskQueue.isNotEmpty) {
+                taskQueue.removeFirst();
+                addTask(task);
+              }
+              // 如果已经是空的还添加不进去意味着将自己也扔掉
+              break;
+            case RejectedExecutionHandler.discardPolicy:
+              break;
+          }
+        }
+      }
+
       startListen = () => receivePort.listen((message) {
             List list = message;
             scheduleMicrotask(() {
-              taskQueue.add(ITask._taskValue(list[0], list[1], list[2]));
+              addTask(ITask._taskValue(list[0], list[1], list[2]));
               _poolTask();
             });
           });

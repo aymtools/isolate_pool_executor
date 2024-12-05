@@ -1,3 +1,7 @@
+## 2.0.0
+
+* Allow customization of task execution in Isolate.
+
 ## 1.2.3
 
 * Allow obtaining the content of the message before submitting the task for calculating the order.

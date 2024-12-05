@@ -188,11 +188,18 @@ class _IsolateExecutor {
   }
 }
 
+TaskInvoker _taskInvoker = (taskId, function, message) async {
+  dynamic result = function(message);
+  if (result is Future) {
+    result = await result;
+  }
+  return result;
+};
+
 Future<_TaskResult> _invokeTask(_Task task) async {
   final taskResult = task.makeResult();
   try {
-    final function = task.function;
-    dynamic result = function(task.message);
+    dynamic result = _taskInvoker(task.taskId, task.function, task.message);
     if (result is Future) {
       result = await result;
     }
