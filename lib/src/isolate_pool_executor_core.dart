@@ -355,16 +355,14 @@ void _worker(List args) {
     ReceivePort receivePort = ReceivePort();
     sendPort.send(receivePort.sendPort);
 
-    try {
-      FutureOr<void> Function(Map<Object, Object?>? isolateValues)?
-          onIsolateCreated = args[4];
-      if (onIsolateCreated != null) {
-        final result = onIsolateCreated.call(_isolateValues);
-        if (result is Future) {
-          await result;
-        }
+    FutureOr<void> Function(Map<Object, Object?> isolateValues)?
+        onIsolateCreated = args[4];
+    if (onIsolateCreated != null) {
+      final result = onIsolateCreated.call(_isolateValues);
+      if (result is Future) {
+        await result;
       }
-    } catch (_) {}
+    }
 
     final _Task? task = args[3];
 
