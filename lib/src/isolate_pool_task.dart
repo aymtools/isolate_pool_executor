@@ -198,18 +198,20 @@ TaskInvoker _taskInvoker = (taskId, function, message) async {
 
 Future<_TaskResult> _invokeTask(_Task task) async {
   final taskResult = task.makeResult();
-  try {
-    dynamic result = _taskInvoker(task.taskId, task.function, task.message);
-    if (result is Future) {
-      result = await result;
+  Completer<_TaskResult> computer = Completer();
+  runZonedGuarded(() async {
+    dynamic r = _taskInvoker(task.taskId, task.function, task.message);
+    if (r is Future) {
+      r = await r;
     }
-    taskResult.result = result;
-  } catch (err, stackTrace) {
-    taskResult.err = err;
-    taskResult.stackTrace = stackTrace;
-  } finally {
-    return taskResult;
-  }
+    taskResult.result = r;
+    if (!computer.isCompleted) computer.complete(taskResult);
+  }, (error, stack) {
+    taskResult.err = error;
+    taskResult.stackTrace = stack;
+    if (!computer.isCompleted) computer.complete(taskResult);
+  });
+  return computer.future;
 }
 
 void _runIsolateWorkGuarded(SendPort sendPort, void Function() block) {

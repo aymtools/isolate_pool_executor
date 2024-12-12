@@ -1,6 +1,8 @@
 ## 2.0.0
 
 * Allow customization of task execution in Isolate.
+* Fix `onIsolateCreated` bug
+* Improve the ability to capture task exceptions
 
 ## 1.2.3
 

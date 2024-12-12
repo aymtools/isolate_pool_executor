@@ -150,20 +150,20 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
   _runTask(ITask taskX) async {
     final task = taskX._task;
     if (task == null) return;
-    final result = task.makeResult();
-    try {
+    final taskResult = task.makeResult();
+    runZonedGuarded(() async {
       final invoker = customTaskInvoker ?? _taskInvoker;
       dynamic r = invoker(task.taskId, task.function, task.message);
       if (r is Future) {
         r = await r;
       }
-      result.result = r;
-    } catch (e, st) {
-      result.err = e;
-      result.stackTrace = st;
-    } finally {
-      taskX._submit(result);
-    }
+      taskResult.result = r;
+      taskX._submit(taskResult);
+    }, (error, stack) {
+      taskResult.err = error;
+      taskResult.stackTrace = stack;
+      taskX._submit(taskResult);
+    });
   }
 
   void _poolTask([_IsolateExecutor? executorIdle]) {
