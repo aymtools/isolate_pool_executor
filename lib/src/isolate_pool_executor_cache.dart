@@ -6,8 +6,8 @@ extension _IsolatePoolExecutorCoreNoCache on _IsolatePoolExecutorCore {
     String? debugLabel;
     assert(() {
       debugLabel =
-          'IsolatePoolExecutor${this.debugLabel?.isNotEmpty == true ? '-${this.debugLabel}' : ''}'
-          '-NotCache-${_isolateIndex++}-worker';
+          'IsolatePoolExecutor-NotCache${this.debugLabel?.isNotEmpty == true ? '-${this.debugLabel}' : ''}'
+          '-${_isolateIndex++}';
       return true;
     }());
 

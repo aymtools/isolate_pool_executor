@@ -136,7 +136,7 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
 
     assert(() {
       debugLabel =
-          'SingleIsolatePoolExecutor${this.debugLabel?.isNotEmpty == true ? '-${this.debugLabel}' : ''}-worker';
+          'IsolatePoolExecutor-Single${this.debugLabel?.isNotEmpty == true ? '-${this.debugLabel}' : ''}';
       return true;
     }());
 

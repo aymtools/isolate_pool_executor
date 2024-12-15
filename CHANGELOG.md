@@ -3,6 +3,7 @@
 * Allow customization of task execution in Isolate.
 * Fix `onIsolateCreated` bug
 * Improve the ability to capture task exceptions
+* Modify debugLabel name
 
 ## 1.2.3
 

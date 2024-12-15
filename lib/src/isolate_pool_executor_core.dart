@@ -254,9 +254,9 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
     final receivePort = RawReceivePort();
     String? debugLabel;
     assert(() {
-      debugLabel =
-          'IsolatePoolExecutor${this.debugLabel?.isNotEmpty == true ? '-${this.debugLabel}' : ''}'
-          '-${isCore ? 'Core' : 'NotCore'}-${_isolateIndex++}-worker';
+      debugLabel = 'IsolatePoolExecutor-${isCore ? 'Core' : 'NotCore'}'
+          '${this.debugLabel?.isNotEmpty == true ? '-${this.debugLabel}' : ''}'
+          '-${_isolateIndex++}';
       return true;
     }());
 
