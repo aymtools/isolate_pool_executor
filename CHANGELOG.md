@@ -1,3 +1,7 @@
+## 2.1.0
+
+* The TaskInvoker adds a new parameter debugLabel.
+
 ## 2.0.0
 
 * Allow customization of task execution in Isolate.

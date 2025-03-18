@@ -26,6 +26,16 @@ enum RejectedExecutionHandler {
   discardPolicy,
 }
 
+/// 兼容旧版本 未来移除
+TaskInvoker? _warpTaskInvoker(
+    Future<dynamic> Function(
+            int taskId, FutureOr Function(dynamic) function, dynamic message)?
+        invoker) {
+  if (invoker == null) return null;
+  return (taskId, function, message, debugLabel) =>
+      invoker(taskId, function, message);
+}
+
 /// 池化的isolate
 abstract class IsolatePoolExecutor {
   /// [launchCoreImmediately] 是否立即启动所有的核心isolate
@@ -42,7 +52,11 @@ abstract class IsolatePoolExecutor {
     FutureOr<void> Function(Map<Object, Object?> isolateValues)?
         onIsolateCreated,
     int onIsolateCreateTimeoutTimesDoNotCreateNew = 0,
-    TaskInvoker? customTaskInvoker,
+    @Deprecated('Use customizeTaskInvoker, deprecated after v2.1.0 ')
+    Future<dynamic> Function(
+            int taskId, FutureOr Function(dynamic) function, dynamic message)?
+        customTaskInvoker,
+    TaskInvoker? customizeTaskInvoker,
     String? debugLabel,
   }) {
     assert(maximumPoolSize >= corePoolSize);
@@ -58,7 +72,8 @@ abstract class IsolatePoolExecutor {
       onIsolateCreated: onIsolateCreated,
       onIsolateCreateTimeoutTimesDoNotCreateNew:
           onIsolateCreateTimeoutTimesDoNotCreateNew,
-      customTaskInvoker: customTaskInvoker,
+      customizeTaskInvoker:
+          customizeTaskInvoker ?? _warpTaskInvoker(customTaskInvoker),
       debugLabel: debugLabel,
     );
   }
@@ -75,7 +90,11 @@ abstract class IsolatePoolExecutor {
     FutureOr<void> Function(Map<Object, Object?> isolateValues)?
         onIsolateCreated,
     int onIsolateCreateTimeoutTimesDoNotCreateNew = 0,
-    TaskInvoker? customTaskInvoker,
+    @Deprecated('Use taskInvoker, deprecated after v2.1.0 ')
+    Future<dynamic> Function(
+            int taskId, FutureOr Function(dynamic) function, dynamic message)?
+        customTaskInvoker,
+    TaskInvoker? customizeTaskInvoker,
     String? debugLabel,
   }) =>
       _IsolatePoolExecutorCore(
@@ -90,7 +109,8 @@ abstract class IsolatePoolExecutor {
         onIsolateCreated: onIsolateCreated,
         onIsolateCreateTimeoutTimesDoNotCreateNew:
             onIsolateCreateTimeoutTimesDoNotCreateNew,
-        customTaskInvoker: customTaskInvoker,
+        customizeTaskInvoker:
+            customizeTaskInvoker ?? _warpTaskInvoker(customTaskInvoker),
         debugLabel: debugLabel,
       );
 
@@ -104,7 +124,11 @@ abstract class IsolatePoolExecutor {
     bool launchCoreImmediately = false,
     FutureOr<void> Function(Map<Object, Object?> isolateValues)?
         onIsolateCreated,
-    TaskInvoker? customTaskInvoker,
+    @Deprecated('Use customizeTaskInvoker, deprecated after v2.1.0 ')
+    Future<dynamic> Function(
+            int taskId, FutureOr Function(dynamic) function, dynamic message)?
+        customTaskInvoker,
+    TaskInvoker? customizeTaskInvoker,
     String? debugLabel,
   }) =>
       taskQueueInIsolate
@@ -114,7 +138,8 @@ abstract class IsolatePoolExecutor {
               isolateValues: isolateValues,
               launchCoreImmediately: launchCoreImmediately,
               onIsolateCreated: onIsolateCreated,
-              customTaskInvoker: customTaskInvoker,
+              customizeTaskInvoker:
+                  customizeTaskInvoker ?? _warpTaskInvoker(customTaskInvoker),
               debugLabel: debugLabel,
             )
           : IsolatePoolExecutor.newFixedIsolatePool(
@@ -124,7 +149,8 @@ abstract class IsolatePoolExecutor {
               isolateValues: isolateValues,
               launchCoreImmediately: launchCoreImmediately,
               onIsolateCreated: onIsolateCreated,
-              customTaskInvoker: customTaskInvoker,
+              customizeTaskInvoker:
+                  customizeTaskInvoker ?? _warpTaskInvoker(customTaskInvoker),
               debugLabel: debugLabel,
             );
 
@@ -134,7 +160,11 @@ abstract class IsolatePoolExecutor {
     Map<Object, Object?>? isolateValues,
     FutureOr<void> Function(Map<Object, Object?> isolateValues)?
         onIsolateCreated,
-    TaskInvoker? customTaskInvoker,
+    @Deprecated('Use taskInvoker, deprecated after v2.1.0 ')
+    Future<dynamic> Function(
+            int taskId, FutureOr Function(dynamic) function, dynamic message)?
+        customTaskInvoker,
+    TaskInvoker? customizeTaskInvoker,
     String? debugLabel,
   }) =>
       _IsolatePoolExecutorCore(
@@ -146,7 +176,8 @@ abstract class IsolatePoolExecutor {
         handler: RejectedExecutionHandler.abortPolicy,
         isolateValues: isolateValues,
         onIsolateCreated: onIsolateCreated,
-        customTaskInvoker: customTaskInvoker,
+        customizeTaskInvoker:
+            customizeTaskInvoker ?? _warpTaskInvoker(customTaskInvoker),
         debugLabel: debugLabel,
       );
 
@@ -171,8 +202,8 @@ extension IsolateDataExt on Isolate {
 }
 
 /// 自定义对于task的执行器
-typedef TaskInvoker = Future Function(
-    int taskId, FutureOr Function(dynamic) function, dynamic message);
+typedef TaskInvoker = Future<dynamic> Function(int taskId,
+    FutureOr Function(dynamic) function, dynamic message, String debugLabel);
 
 /// 当策略为RejectedExecutionHandler.abortPolicy 且无法添加到Queue时 的异常
 class RejectedExecutionException implements Exception {

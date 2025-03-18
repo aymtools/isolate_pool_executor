@@ -15,7 +15,7 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
   final FutureOr<void> Function(Map<Object, Object?> isolateValues)?
       onIsolateCreated;
 
-  final TaskInvoker? customTaskInvoker;
+  final TaskInvoker? customizeTaskInvoker;
 
   final String? debugLabel;
 
@@ -32,7 +32,7 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
       this.isolateValues,
       bool launchCoreImmediately = false,
       this.onIsolateCreated,
-      this.customTaskInvoker,
+      this.customizeTaskInvoker,
       this.debugLabel})
       : taskQueueFactory = taskQueueFactory {
     assert(
@@ -219,7 +219,7 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
     args[3] = fistTask?._task;
     args[4] = onIsolateCreated;
     args[5] = handler;
-    args[6] = customTaskInvoker;
+    args[6] = customizeTaskInvoker;
 
     Isolate.spawn(_workerSingle, args,
             onError: receivePort.sendPort,

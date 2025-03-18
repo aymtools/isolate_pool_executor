@@ -188,7 +188,7 @@ class _IsolateExecutor {
   }
 }
 
-TaskInvoker _taskInvoker = (taskId, function, message) async {
+TaskInvoker _taskInvoker = (taskId, function, message, taskLabel) async {
   dynamic result = function(message);
   if (result is Future) {
     result = await result;
@@ -200,7 +200,8 @@ Future<_TaskResult> _invokeTask(_Task task) async {
   final taskResult = task.makeResult();
   Completer<_TaskResult> computer = Completer();
   runZonedGuarded(() async {
-    dynamic r = _taskInvoker(task.taskId, task.function, task.message);
+    dynamic r =
+        _taskInvoker(task.taskId, task.function, task.message, task.taskLabel);
     if (r is Future) {
       r = await r;
     }

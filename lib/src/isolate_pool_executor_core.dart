@@ -33,7 +33,7 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
   int _isolateCreateTimeoutCounter = 0;
   int _isolateIndex = 0;
 
-  final TaskInvoker? customTaskInvoker;
+  final TaskInvoker? customizeTaskInvoker;
 
   _IsolatePoolExecutorCore(
       {required this.corePoolSize,
@@ -46,7 +46,7 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
       this.onIsolateCreated,
       int immediatelyStartedCore = 0,
       int onIsolateCreateTimeoutTimesDoNotCreateNew = -1,
-      this.customTaskInvoker,
+      this.customizeTaskInvoker,
       this.debugLabel})
       : _coreExecutor = List.filled(corePoolSize, null),
         cachePoolSize = maximumPoolSize - corePoolSize,
@@ -152,8 +152,9 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
     if (task == null) return;
     final taskResult = task.makeResult();
     runZonedGuarded(() async {
-      final invoker = customTaskInvoker ?? _taskInvoker;
-      dynamic r = invoker(task.taskId, task.function, task.message);
+      final invoker = customizeTaskInvoker ?? _taskInvoker;
+      dynamic r =
+          invoker(task.taskId, task.function, task.message, task.taskLabel);
       if (r is Future) {
         r = await r;
       }
@@ -319,7 +320,7 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
     args[2] = isolateValues;
     args[3] = task?._task;
     args[4] = onIsolateCreated;
-    args[5] = customTaskInvoker;
+    args[5] = customizeTaskInvoker;
 
     Isolate.spawn(_worker, args,
             onError: receivePort.sendPort,

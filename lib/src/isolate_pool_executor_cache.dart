@@ -19,7 +19,7 @@ extension _IsolatePoolExecutorCoreNoCache on _IsolatePoolExecutorCore {
       args[1] = task;
       args[2] = isolateValues;
       args[3] = onIsolateCreated;
-      args[4] = customTaskInvoker;
+      args[4] = customizeTaskInvoker;
 
       Isolate.spawn(_workerNoCache, args,
               onError: receivePort.sendPort,
