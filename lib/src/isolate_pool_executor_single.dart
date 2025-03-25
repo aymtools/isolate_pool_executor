@@ -50,10 +50,10 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
   @override
   TaskFuture<R> compute<Q, R>(
       FutureOr<R> Function(Q message) callback, Q message,
-      {String? debugLabel, int what = 0, dynamic tag}) {
+      {String? debugLabel, int what = 0, dynamic tag, String? taskLabel}) {
     debugLabel ??= callback.toString();
-    final task =
-        _makeTask<R>((d) => callback(d), message, debugLabel, what, tag);
+    final task = _makeTask<R>(
+        (d) => callback(d), message, taskLabel ?? debugLabel, what, tag);
     return TaskFuture<R>._(task);
   }
 
@@ -69,12 +69,12 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
   }
 
   ITask<R> _makeTask<R>(dynamic Function(dynamic p) run, dynamic p,
-      String debugLabel, int what, dynamic tag) {
+      String taskLabel, int what, dynamic tag) {
     if (_shutdown) {
       throw 'SingleIsolatePoolExecutor${this.debugLabel?.isNotEmpty == true ? '-${this.debugLabel}' : ''} is shutdown';
     }
 
-    ITask<R> task = ITask<R>._task(run, p, debugLabel, what, tag);
+    ITask<R> task = ITask<R>._task(run, p, taskLabel, what, tag);
     taskQueue[task.taskId] = task;
 
     _emitTask(task, what, tag);
@@ -83,11 +83,6 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
 
   void _emitTask1(ITask task, int what, dynamic tag) {
     final t = task._task;
-    final message = List<dynamic>.filled(3, null);
-    message[0] = t;
-    message[1] = what;
-    message[2] = tag;
-
     var executor = _coreExecutor[0];
     if (executor == null) {
       executor = _makeExecutor(task);
@@ -98,7 +93,7 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
       creatingCache.add(task);
     } else if (!executor.isClosed) {
       try {
-        executor._sendPort!.send(message);
+        executor._sendPort!.send(t);
         task._task = null;
       } catch (err, st) {
         task._submitError(err, st);
@@ -338,9 +333,8 @@ void _workerSingle(List args) {
       }
 
       startListen = () => receivePort.listen((message) {
-            List list = message;
             scheduleMicrotask(() {
-              addTask(ITask._taskValue(list[0], list[1], list[2]));
+              addTask(ITask._taskValue(message));
               _poolTask();
             });
           });

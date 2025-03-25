@@ -73,10 +73,10 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
   @override
   TaskFuture<R> compute<Q, R>(
       FutureOr<R> Function(Q message) callback, Q message,
-      {String? debugLabel, int what = 0, dynamic tag}) {
+      {String? debugLabel, int what = 0, dynamic tag, String? taskLabel}) {
     debugLabel ??= callback.toString();
-    final task =
-        _makeTask<R>((d) => callback(d), message, debugLabel, what, tag);
+    final task = _makeTask<R>(
+        (d) => callback(d), message, taskLabel ?? debugLabel, what, tag);
     return TaskFuture<R>._(task);
   }
 
@@ -99,12 +99,12 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
   }
 
   ITask<R> _makeTask<R>(dynamic Function(dynamic p) run, dynamic p,
-      String debugLabel, int what, dynamic tag) {
+      String taskLabel, int what, dynamic tag) {
     if (_shutdown) {
       throw 'IsolatePoolExecutor${this.debugLabel?.isNotEmpty == true ? '-${this.debugLabel}' : ''} is shutdown';
     }
 
-    ITask<R> task = ITask<R>._task(run, p, debugLabel, what, tag);
+    ITask<R> task = ITask<R>._task(run, p, taskLabel, what, tag);
 
     _addTask(task);
 
@@ -153,8 +153,8 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
     final taskResult = task.makeResult();
     runZonedGuarded(() async {
       final invoker = customizeTaskInvoker ?? _taskInvoker;
-      dynamic r =
-          invoker(task.taskId, task.function, task.message, task.taskLabel);
+      dynamic r = invoker(task.taskId, task.function, task.message,
+          task.taskLabel, task.what, task.tag);
       if (r is Future) {
         r = await r;
       }

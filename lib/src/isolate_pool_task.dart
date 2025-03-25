@@ -15,7 +15,7 @@ class ITask<R> {
   _Task? _task;
 
   final Completer<R> _computer;
-
+  final String taskLabel;
   final dynamic tag;
   final int what;
 
@@ -28,22 +28,21 @@ class ITask<R> {
   ITask._task(
     FutureOr Function(dynamic q) function,
     dynamic message,
-    String taskLabel,
+    this.taskLabel,
     this.what,
     this.tag,
   )   : taskId = _nextTaskId(),
         _computer = Completer<R>() {
-    _task = _Task(function, message, taskId, taskLabel);
+    _task = _Task(function, message, taskId, taskLabel, what, tag);
   }
 
   ITask._taskValue(
-    _Task task,
-    this.what,
-    this.tag,
-  )   : taskId = task.taskId,
-        _computer = Completer<R>() {
-    _task = task;
-  }
+    _Task this._task,
+  )   : taskId = _task.taskId,
+        taskLabel = _task.taskLabel,
+        what = _task.what,
+        tag = _task.tag,
+        _computer = Completer<R>();
 
   Future<R> get _future => _computer.future;
 
@@ -63,8 +62,8 @@ class ITask<R> {
 }
 
 class _TaskResult {
-  final String taskLabel;
   final int taskId;
+  final String taskLabel;
   dynamic result;
   dynamic err;
   StackTrace? stackTrace;
@@ -73,12 +72,15 @@ class _TaskResult {
 }
 
 class _Task {
-  final String taskLabel;
   final int taskId;
+  final String taskLabel;
   final dynamic message;
   final FutureOr Function(dynamic q) function;
+  final int what;
+  final dynamic tag;
 
-  _Task(this.function, this.message, this.taskId, this.taskLabel);
+  _Task(this.function, this.message, this.taskId, this.taskLabel, this.what,
+      this.tag);
 
   _TaskResult makeResult() => _TaskResult(taskLabel, taskId);
 }
@@ -188,7 +190,7 @@ class _IsolateExecutor {
   }
 }
 
-TaskInvoker _taskInvoker = (taskId, function, message, taskLabel) async {
+TaskInvoker _taskInvoker = (taskId, function, message, _, __, ___) async {
   dynamic result = function(message);
   if (result is Future) {
     result = await result;
@@ -200,8 +202,8 @@ Future<_TaskResult> _invokeTask(_Task task) async {
   final taskResult = task.makeResult();
   Completer<_TaskResult> computer = Completer();
   runZonedGuarded(() async {
-    dynamic r =
-        _taskInvoker(task.taskId, task.function, task.message, task.taskLabel);
+    dynamic r = _taskInvoker(task.taskId, task.function, task.message,
+        task.taskLabel, task.what, task.tag);
     if (r is Future) {
       r = await r;
     }

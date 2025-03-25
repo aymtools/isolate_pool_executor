@@ -1,6 +1,12 @@
 ## 2.1.0
 
-* The TaskInvoker adds a new parameter debugLabel.
+* customizeTaskInvoker adds new parameters: taskLabel, what, and tag, derived from the corresponding
+  parameters in compute.
+
+### Breaking Changes
+
+* The tag parameter in compute will be sent to the isolate. Note that you should verify whether the
+  parameter value can be sent. https://api.dart.dev/dart-isolate/SendPort/send.html
 
 ## 2.0.0
 

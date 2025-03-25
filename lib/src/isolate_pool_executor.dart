@@ -6,9 +6,13 @@ import 'dart:math';
 import 'package:isolate_pool_executor/src/queue/queue_empty.dart';
 
 part 'future/task_future.dart';
+
 part 'isolate_pool_executor_cache.dart';
+
 part 'isolate_pool_executor_core.dart';
+
 part 'isolate_pool_executor_single.dart';
+
 part 'isolate_pool_task.dart';
 
 ///饱和策略，当阻塞队列满了，且没有空闲的工作线程，如果继续提交任务，必须采取一种策略处理该任务，提供4种策略:
@@ -32,7 +36,7 @@ TaskInvoker? _warpTaskInvoker(
             int taskId, FutureOr Function(dynamic) function, dynamic message)?
         invoker) {
   if (invoker == null) return null;
-  return (taskId, function, message, debugLabel) =>
+  return (taskId, function, message, _, __, ___) =>
       invoker(taskId, function, message);
 }
 
@@ -182,9 +186,11 @@ abstract class IsolatePoolExecutor {
       );
 
   /// 提交一个任务
+  /// [message] [tag] 将会被发送到isolate中 注意是否可以发送
+  /// https://api.dart.dev/dart-isolate/SendPort/send.html
   TaskFuture<R> compute<Q, R>(
       FutureOr<R> Function(Q message) callback, Q message,
-      {String? debugLabel, int what = 0, dynamic tag});
+      {String? debugLabel, int what = 0, dynamic tag, String? taskLabel});
 
   /// 关闭当前的pool
   void shutdown({bool force = false});
@@ -202,8 +208,13 @@ extension IsolateDataExt on Isolate {
 }
 
 /// 自定义对于task的执行器
-typedef TaskInvoker = Future<dynamic> Function(int taskId,
-    FutureOr Function(dynamic) function, dynamic message, String debugLabel);
+typedef TaskInvoker = Future<dynamic> Function(
+    int taskId,
+    FutureOr Function(dynamic) function,
+    dynamic message,
+    String taskLabel,
+    int what,
+    dynamic tag);
 
 /// 当策略为RejectedExecutionHandler.abortPolicy 且无法添加到Queue时 的异常
 class RejectedExecutionException implements Exception {
