@@ -72,8 +72,8 @@ class UniqueQueue<T> extends IterableBase<T> implements Queue<T> {
   }
 
   @override
-  void forEach(void Function(T element) f) {
-    _items.forEach(f);
+  void forEach(void Function(T element) action) {
+    _items.forEach(action);
   }
 
   @override

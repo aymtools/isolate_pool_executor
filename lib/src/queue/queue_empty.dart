@@ -1,19 +1,19 @@
 import 'dart:collection';
 
-/** The always empty iterator. */
+/// The always empty iterator.
 class EmptyIterator<E> implements Iterator<E> {
   const EmptyIterator();
 
+  @override
   bool moveNext() => false;
 
+  @override
   E get current {
     throw IterableElementError.noElement();
   }
 }
 
-/**
- * The always empty Queue.
- */
+/// The always empty Queue.
 class QueueEmpty<E> implements Queue<E> {
   @override
   void add(E value) {
@@ -194,16 +194,14 @@ class QueueEmpty<E> implements Queue<E> {
   }
 }
 
-/**
- * Creates errors throw by [Iterable] when the element count is wrong.
- */
+/// Creates errors throw by [Iterable] when the element count is wrong.
 abstract class IterableElementError {
-  /** Error thrown thrown by, e.g., [Iterable.first] when there is no result. */
+  /// Error thrown thrown by, e.g., [Iterable.first] when there is no result.
   static StateError noElement() => StateError("No element");
 
-  /** Error thrown by, e.g., [Iterable.single] if there are too many results. */
+  /// Error thrown by, e.g., [Iterable.single] if there are too many results.
   static StateError tooMany() => StateError("Too many elements");
 
-  /** Error thrown by, e.g., [List.setRange] if there are too few elements. */
+  /// Error thrown by, e.g., [List.setRange] if there are too few elements.
   static StateError tooFew() => StateError("Too few elements");
 }

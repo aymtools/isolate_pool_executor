@@ -4,7 +4,7 @@ import 'dart:math';
 
 import 'package:isolate_pool_executor/isolate_pool_executor.dart';
 
-main() {
+void main() {
   final pool1 = IsolatePoolExecutor.newSingleIsolateExecutor();
 
   pool1.compute(printName, 100000000);
@@ -112,17 +112,16 @@ main() {
 
 int printName(int n) {
   int startTime = DateTime.now().millisecondsSinceEpoch;
-  print(Isolate.current.debugName! + ' start input: $n ');
+  print('${Isolate.current.debugName!} start input: $n ');
   final v = _doTask(n);
   int endTime = DateTime.now().millisecondsSinceEpoch;
-  print(Isolate.current.debugName! +
-      ' end input: $n value: $v  use time: ${endTime - startTime}');
+  print('${Isolate.current.debugName!} end input: $n value: $v  use time: ${endTime - startTime}');
   return v;
 }
 
 int _doTask(int count) {
   int sum = 0;
-  final random = new Random();
+  final random = Random();
   for (int i = 0; i < count; i++) {
     sum += random.nextInt(10000);
   }

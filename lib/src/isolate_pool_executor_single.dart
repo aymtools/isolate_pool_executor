@@ -27,14 +27,13 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
       taskQueueFactory == null ? _emitTask2 : _emitTask1;
 
   _IsolatePoolSingleExecutor(
-      {Queue<ITask> Function()? taskQueueFactory,
+      {this.taskQueueFactory,
       this.handler,
       this.isolateValues,
       bool launchCoreImmediately = false,
       this.onIsolateCreated,
       this.customizeTaskInvoker,
-      this.debugLabel})
-      : taskQueueFactory = taskQueueFactory {
+      this.debugLabel}) {
     assert(
         taskQueueFactory == null ||
             handler != RejectedExecutionHandler.callerRunsPolicy,
@@ -71,7 +70,7 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
   ITask<R> _makeTask<R>(dynamic Function(dynamic p) run, dynamic p,
       String taskLabel, int what, dynamic tag) {
     if (_shutdown) {
-      throw 'SingleIsolatePoolExecutor${this.debugLabel?.isNotEmpty == true ? '-${this.debugLabel}' : ''} is shutdown';
+      throw 'SingleIsolatePoolExecutor${debugLabel?.isNotEmpty == true ? '-$debugLabel' : ''} is shutdown';
     }
 
     ITask<R> task = ITask<R>._task(run, p, taskLabel, what, tag);
@@ -142,9 +141,9 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
     executor.onTimeout = () {
       var error =
           "Create Isolate timeout \n https://github.com/flutter/flutter/issues/132731";
-      taskQueue.values.forEach((task) {
+      for (var task in [...taskQueue.values]) {
         task._submitError(error, StackTrace.empty);
-      });
+      }
       executor.close();
       taskQueue.clear();
       creatingCache.clear();
@@ -154,9 +153,9 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
       if (message == null) {
         //执行了Isolate exit
         final err = RemoteError("Computation ended without result", "");
-        taskQueue.values.forEach((task) {
+        for (var task in [...taskQueue.values]) {
           task._submitError(err, StackTrace.empty);
-        });
+        }
         executor.close();
         taskQueue.clear();
         creatingCache.clear();
@@ -164,12 +163,12 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
         // if (!completer.isCompleted) completer.complete(message);
         executor.sendPort = message;
         if (taskQueueFactory == null) {
-          creatingCache.forEach((task) {
+          for (var task in [...creatingCache]) {
             message.send(task._task!);
             task._task = null;
-          });
+          }
         } else {
-          creatingCache.forEach((task) {
+          for (var task in [...creatingCache]) {
             final t = task._task;
             final msg = List<dynamic>.filled(3, null);
             msg[0] = t;
@@ -177,7 +176,7 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
             msg[2] = task.tag;
             message.send(msg);
             task._task = null;
-          });
+          }
         }
         creatingCache.clear();
         return;
@@ -199,9 +198,9 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
           remoteStack = error.stackTrace;
         }
 
-        taskQueue.values.forEach((task) {
+        for (var task in [...taskQueue.values]) {
           task._submitError(remoteError, remoteStack);
-        });
+        }
         executor.close();
         taskQueue.clear();
         creatingCache.clear();
@@ -225,9 +224,9 @@ class _IsolatePoolSingleExecutor implements IsolatePoolExecutor {
     }).catchError(
       (error, stackTrace) {
         executor.close();
-        taskQueue.values.forEach((task) {
+        for (var task in [...taskQueue.values]) {
           task._submitError(error, stackTrace);
-        });
+        }
         executor.close();
         taskQueue.clear();
         creatingCache.clear();
@@ -282,16 +281,16 @@ void _workerSingle(List args) {
       Queue<ITask> taskQueue = taskQueueFactory();
       _Task? doingTask;
 
-      late void Function() _poolTask;
+      late void Function() poolTask;
 
       void invokeTask(_Task task) async {
         final taskResult = await _invokeTask(task);
         sendPort.send(taskResult);
         doingTask = null;
-        _poolTask();
+        poolTask();
       }
 
-      _poolTask = () {
+      poolTask = () {
         scheduleMicrotask(() {
           if (doingTask != null) return;
           while (doingTask == null && taskQueue.isNotEmpty) {
@@ -335,7 +334,7 @@ void _workerSingle(List args) {
       startListen = () => receivePort.listen((message) {
             scheduleMicrotask(() {
               addTask(ITask._taskValue(message));
-              _poolTask();
+              poolTask();
             });
           });
     }

@@ -80,6 +80,7 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
     return TaskFuture<R>._(task);
   }
 
+  @override
   void shutdown({bool force = false}) {
     _shutdown = true;
     if (force) {
@@ -101,7 +102,7 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
   ITask<R> _makeTask<R>(dynamic Function(dynamic p) run, dynamic p,
       String taskLabel, int what, dynamic tag) {
     if (_shutdown) {
-      throw 'IsolatePoolExecutor${this.debugLabel?.isNotEmpty == true ? '-${this.debugLabel}' : ''} is shutdown';
+      throw 'IsolatePoolExecutor${debugLabel?.isNotEmpty == true ? '-$debugLabel' : ''} is shutdown';
     }
 
     ITask<R> task = ITask<R>._task(run, p, taskLabel, what, tag);
@@ -147,7 +148,7 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
     }
   }
 
-  _runTask(ITask taskX) async {
+  Future<void> _runTask(ITask taskX) async {
     final task = taskX._task;
     if (task == null) return;
     final taskResult = task.makeResult();
@@ -187,7 +188,7 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
     });
   }
 
-  _isolateCreateSupervisor(_IsolateExecutor executor) {
+  void _isolateCreateSupervisor(_IsolateExecutor executor) {
     if (onIsolateCreateTimeoutTimesDoNotCreateNew > 0) {
       executor.onTimeout = () {
         _isolateCreateTimeoutCounter++;

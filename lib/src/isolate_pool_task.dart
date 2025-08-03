@@ -159,7 +159,7 @@ class _IsolateExecutor {
 
   void emit(ITask task) {
     if (_task == task) return;
-    this._task = task;
+    _task = task;
     assert(!isIdle, 'IsolateExecutor is busy');
     try {
       _sendPort!.send(task._task);
@@ -227,7 +227,7 @@ void _runIsolateWorkGuarded(SendPort sendPort, void Function() block) {
 }
 
 extension _ListFirstWhereOrNullExt<E> on List<E> {
-  E? firstWhereOrNull(bool test(E element)) {
+  E? firstWhereOrNull(bool Function(E element) test) {
     for (E element in this) {
       if (test(element)) return element;
     }
@@ -243,6 +243,7 @@ class CreateIsolateTimeoutException implements Exception {
   CreateIsolateTimeoutException(
       {required this.debugLabel, required this.waitTime});
 
+  @override
   String toString() {
     return "Create Isolate(${debugLabel ?? ''}) timeout (wait $waitTime seconds)\n "
         "Known cause:\n1.Open too many isolates at the same time \n2.https://github.com/flutter/flutter/issues/132731";
