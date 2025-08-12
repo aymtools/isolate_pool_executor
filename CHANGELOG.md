@@ -1,6 +1,6 @@
 ## 2.2.0
 
-*
+* Optimize the content of the lints.
 
 ## 2.1.0
 
