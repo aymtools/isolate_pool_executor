@@ -1,3 +1,7 @@
+## 2.2.1
+
+* Fix the bug where the keepAliveTime parameter of IsolatePoolExecutor is ineffective.
+
 ## 2.2.0
 
 * Optimize the content of the lints.

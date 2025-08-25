@@ -227,7 +227,10 @@ class _IsolatePoolExecutorCore implements IsolatePoolExecutor {
       return null;
     }
     if (keepAliveTime == Duration.zero) {
-      return _makeNoCacheExecutor(task);
+      _IsolateExecutor executor = _makeNoCacheExecutor(task);
+      executor.whenClose = () => _cacheExecutor.remove(executor);
+      _cacheExecutor.add(executor);
+      return executor;
     } else if (_canCreateNewIsolate || jumpCheckCanCreateNewIsolate) {
       _IsolateExecutor executor = _makeExecutor(false, task);
       executor.whenClose = () => _cacheExecutor.remove(executor);

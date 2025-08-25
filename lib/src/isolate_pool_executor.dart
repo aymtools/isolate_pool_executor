@@ -43,7 +43,7 @@ abstract class IsolatePoolExecutor {
   factory IsolatePoolExecutor({
     required int corePoolSize,
     required int maximumPoolSize,
-    Duration? keepAliveTime,
+    Duration keepAliveTime = const Duration(seconds: 30),
     Queue<ITask>? taskQueue,
     RejectedExecutionHandler? handler,
     Map<Object, Object?>? isolateValues,
@@ -63,7 +63,7 @@ abstract class IsolatePoolExecutor {
     return _IsolatePoolExecutorCore(
       corePoolSize: corePoolSize,
       maximumPoolSize: maximumPoolSize,
-      keepAliveTime: const Duration(seconds: 30),
+      keepAliveTime: keepAliveTime,
       taskQueue: taskQueue ?? Queue(),
       handler: handler ?? RejectedExecutionHandler.abortPolicy,
       isolateValues: isolateValues,
