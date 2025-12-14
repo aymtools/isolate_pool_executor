@@ -1,6 +1,6 @@
 name: isolate_pool_executor
 description: Just like a thread pool, but with isolates. The Isolate Pool Executor is a tool in Dart for managing concurrent tasks by limiting and reusing isolates to optimize performance.
-version: 2.2.1
+version: 2.2.2
 homepage: https://github.com/aymtools/isolate_pool_executor
 topics:
   - isolate
@@ -13,5 +13,5 @@ environment:
   sdk: '>=2.15.0 <4.0.0'
 
 dev_dependencies:
-  lints: ^6.0.0
-  test: ^1.26.3
+  lints: any
+  test: ^1.5.1

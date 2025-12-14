@@ -1,3 +1,7 @@
+## 2.2.2
+
+* Restored compatibility with version dart 2.15.
+
 ## 2.2.1
 
 * Fix the bug where the keepAliveTime parameter of IsolatePoolExecutor is ineffective.
